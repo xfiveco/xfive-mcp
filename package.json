@@ -1,0 +1,14 @@
+{
+  "name": "xfive-mcp",
+  "version": "1.0.0",
+  "private": true,
+  "license": "UNLICENSED",
+  "author": "Rafal Puczel",
+  "description": "Xfive MCP Server with Abilities API",
+  "scripts": {
+    "phpcs": "cross-env vendor/bin/phpcs --extensions=php --report=full"
+  },
+  "dependencies": {
+    "cross-env": "^10.1.0"
+  }
+}
