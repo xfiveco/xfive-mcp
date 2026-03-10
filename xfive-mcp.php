@@ -1,8 +1,8 @@
 <?php
 /**
  * Plugin Name: xfive Socrates - WordPress MCP Server with Abilities API
- * Description: MCP server with Wordpress Abilities API
- * Version: 1.0.1
+ * Description: MCP server with WordPress Abilities API
+ * Version: 1.0.2
  * Author: Xfive
  * Author URI: https://xfive.co
  * Copyright: Xfive
@@ -26,7 +26,7 @@ define( 'XFIVE_MCP_NAMESPACE', 'XfiveMCP\\' );
  * @var string
  */
 if ( ! defined( 'XFIVE_MCP_VERSION' ) ) {
-	define( 'XFIVE_MCP_VERSION', '1.0.1' );
+	define( 'XFIVE_MCP_VERSION', '1.0.2' );
 }
 
 /**
