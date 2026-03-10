@@ -30,6 +30,9 @@ trait Config {
 			'post-update',
 			'post-trash',
 		),
+		'xfive-images' => array(
+			'image-upload',
+		),
 	);
 
 	/**
