@@ -30,6 +30,8 @@ The below configuration is for Google Antigravity. Some AI tools can require "mc
 }
 ```
 
+In local development you can bypass the authorization by defining `define( 'MCP_OPEN', true );` in your wp-config.php.
+
 ## Available tools:
 
 **xfive-blocks-block-tree** - Displays blocks tree for a post
