@@ -2,7 +2,7 @@
 
 namespace XfiveMCP\Abilities;
 
-use XfiveMCP\Helpers\BlocksHelper;
+use XfiveMCP\Blocks\BlockRegistry;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit; // Exit if accessed directly.
@@ -141,7 +141,7 @@ class BlockReplace extends AbilitiesBase {
 			'innerBlocks' => $args['innerBlocks'] ?? array(),
 		);
 
-		$new_block = BlocksHelper::normalize_block( $new_block_data );
+		$new_block = BlockRegistry::get_instance()->normalize_block( $new_block_data );
 
 		if ( is_wp_error( $new_block ) ) {
 			return $new_block;

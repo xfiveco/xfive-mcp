@@ -60,7 +60,7 @@ class MCP {
 			if ( ! empty( $admins ) ) {
 				wp_set_current_user( $admins[0]->ID );
 			}
-			
+
 			return true;
 		}
 
