@@ -36,9 +36,9 @@ In local development you can bypass the authorization by defining `define( 'MCP_
 
 **xfive-blocks-block-tree** - Displays blocks tree for a post
 
-**xfive-blocks-block-add** - Add blocks to a post
+**xfive-blocks-block-add** - Add blocks to a post. Check block-schema for blocks structure.
 
-**xfive-blocks-block-update** - Modify attributes and content of an existing block within a post. Use when asked for block editing.
+**xfive-blocks-block-update** - Modify attributes and content of an existing block within a post. Use when asked for block editing. Check block-schema for blocks structure.
 
 **xfive-blocks-block-remove** - Remove a block from a post
 
@@ -59,3 +59,5 @@ In local development you can bypass the authorization by defining `define( 'MCP_
 **xfive-posts-post-update** - Update an existing post (title, content, status, etc.).
 
 **xfive-posts-post-trash** - Move a post to the trash.
+
+**xfive-images-image-upload** - Upload an image to the media library. Provide either image_url (remote URL) or local_path (absolute path to a local file).

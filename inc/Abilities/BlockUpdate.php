@@ -2,7 +2,7 @@
 
 namespace XfiveMCP\Abilities;
 
-use XfiveMCP\Helpers\BlocksHelper;
+use XfiveMCP\Blocks\BlockRegistry;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit; // Exit if accessed directly.
@@ -34,7 +34,7 @@ class BlockUpdate extends AbilitiesBase {
 	 * @return string The ability description.
 	 */
 	public function get_description(): string {
-		return 'Modify attributes and content of an existing block within a post. Use when asked for block editing.';
+		return 'Modify attributes and content of an existing block within a post. Use when asked for block editing. Check block-schema for blocks structure.';
 	}
 
 	/**
@@ -167,7 +167,7 @@ class BlockUpdate extends AbilitiesBase {
 			'innerBlocks' => $new_inner_blocks_data,
 		);
 
-		$updated_block = BlocksHelper::normalize_block( $updated_block_data );
+		$updated_block = BlockRegistry::get_instance()->normalize_block( $updated_block_data );
 
 		if ( is_wp_error( $updated_block ) ) {
 			return $updated_block;

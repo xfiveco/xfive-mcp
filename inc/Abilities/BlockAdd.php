@@ -2,7 +2,7 @@
 
 namespace XfiveMCP\Abilities;
 
-use XfiveMCP\Helpers\BlocksHelper;
+use XfiveMCP\Blocks\BlockRegistry;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit; // Exit if accessed directly.
@@ -39,7 +39,7 @@ class BlockAdd extends AbilitiesBase {
 	 * @return string Ability description.
 	 */
 	public function get_description(): string {
-		return 'Add blocks to a post';
+		return 'Add blocks to a post. Check block-schema for blocks structure.';
 	}
 
 	/**
@@ -109,14 +109,11 @@ class BlockAdd extends AbilitiesBase {
 		}
 
 		$blocks    = parse_blocks( $post->post_content );
-		$new_block = BlocksHelper::normalize_block( $args );
+		$new_block = BlockRegistry::get_instance()->normalize_block( $args );
 
 		if ( is_wp_error( $new_block ) ) {
 			return $new_block;
 		}
-
-		// Auto-wrap standalone button blocks in a buttons container.
-		$new_block = BlocksHelper::auto_wrap_button( $new_block, $args );
 
 		$blocks[] = $new_block;
 
