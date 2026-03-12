@@ -153,7 +153,7 @@ class BlockReplace extends AbilitiesBase {
 		$result = wp_update_post(
 			array(
 				'ID'           => $post_id,
-				'post_content' => serialize_blocks( $blocks ),
+				'post_content' => wp_slash( serialize_blocks( $blocks ) ),
 			)
 		);
 
