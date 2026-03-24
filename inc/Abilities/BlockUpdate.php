@@ -169,9 +169,14 @@ class BlockUpdate extends AbilitiesBase {
 			$args['attributes'] ?? array()
 		);
 
-		// Ensure the block has an ID for ACF field association.
-		if ( ! empty( $acf_fields ) && empty( $new_attrs['id'] ) ) {
-			$new_attrs['id'] = AcfHelper::generate_block_id();
+		if ( ! empty( $acf_fields ) ) {
+			// Ensure the block has an ID for ACF to identify this block instance.
+			if ( empty( $new_attrs['id'] ) ) {
+				$new_attrs['id'] = AcfHelper::generate_block_id();
+			}
+
+			// Inject ACF field values into attrs['data'] before serialisation.
+			$new_attrs = AcfHelper::merge_acf_data( $new_attrs, $acf_fields );
 		}
 
 		// Handle inner blocks: if provided, replace; otherwise keep existing.
@@ -203,21 +208,12 @@ class BlockUpdate extends AbilitiesBase {
 			return $result;
 		}
 
-		$block_id = AcfHelper::extract_block_id( $updated_block );
-
-		if ( ! empty( $acf_fields ) && ! empty( $block_id ) ) {
-			$acf_result = AcfHelper::update_block_fields( $block_id, $acf_fields );
-
-			if ( is_wp_error( $acf_result ) ) {
-				return $acf_result;
-			}
-		}
-
 		$response = array(
 			'updated'    => true,
 			'block_name' => $new_block_name,
 		);
 
+		$block_id = AcfHelper::extract_block_id( $updated_block );
 		if ( ! empty( $block_id ) ) {
 			$response['block_id'] = $block_id;
 		}

@@ -145,11 +145,17 @@ class BlockReplace extends AbilitiesBase {
 		// Get the old block name.
 		$old_block_name = $blocks[ $block_index ]['blockName'] ?? 'unknown';
 
-		// Build the new block data, generating a fresh ID for ACF association.
+		// Build the new block data.
 		$new_attrs = $args['attributes'] ?? array();
 
-		if ( ! empty( $acf_fields ) && empty( $new_attrs['id'] ) ) {
-			$new_attrs['id'] = AcfHelper::generate_block_id();
+		if ( ! empty( $acf_fields ) ) {
+			// Generate a fresh block ID for the replacement block.
+			if ( empty( $new_attrs['id'] ) ) {
+				$new_attrs['id'] = AcfHelper::generate_block_id();
+			}
+
+			// Inject ACF field values into attrs['data'] before serialisation.
+			$new_attrs = AcfHelper::merge_acf_data( $new_attrs, $acf_fields );
 		}
 
 		$new_block_data = array(
@@ -178,22 +184,13 @@ class BlockReplace extends AbilitiesBase {
 			return $result;
 		}
 
-		$block_id = AcfHelper::extract_block_id( $new_block );
-
-		if ( ! empty( $acf_fields ) && ! empty( $block_id ) ) {
-			$acf_result = AcfHelper::update_block_fields( $block_id, $acf_fields );
-
-			if ( is_wp_error( $acf_result ) ) {
-				return $acf_result;
-			}
-		}
-
 		$response = array(
 			'replaced'       => true,
 			'old_block_name' => $old_block_name,
 			'new_block_name' => $args['block'],
 		);
 
+		$block_id = AcfHelper::extract_block_id( $new_block );
 		if ( ! empty( $block_id ) ) {
 			$response['block_id'] = $block_id;
 		}

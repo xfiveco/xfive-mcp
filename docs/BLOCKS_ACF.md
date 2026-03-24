@@ -12,15 +12,19 @@ The `BlockAdd`, `BlockUpdate`, and `BlockReplace` abilities support an optional 
 
 ## How It Works
 
-ACF stores block field values in the database using a synthetic post ID of the form `block_{block_id}`, where `block_id` is a unique identifier stored in the block's `id` attribute (e.g. `block_682a1c3f4b2e8`).
+ACF blocks store their field values **directly inside the serialised block comment** in the `data` attribute, alongside ACF field key references:
+
+```
+<!-- wp:acf/my-block {"data":{"heading":"Hello","_heading":"field_abc123"},"id":"block_682a1c3f4b2e8"} /-->
+```
 
 When you provide `acf_fields`:
 
-1. A unique block `id` is generated automatically (if the block does not already have one) and saved as a block attribute.
-2. The block is written to the post content.
-3. `update_field()` is called for each key/value pair in `acf_fields`, targeting the block's `id`.
+1. A unique block `id` is generated automatically (if the block does not already have one) and stored as a block attribute.
+2. For each field, `acf_get_field()` is called to resolve the ACF field key (e.g. `field_abc123`), which is stored as `_field_name` alongside the value.
+3. The complete `data` object is merged into the block's `attrs` and serialised into the block comment in a single `wp_update_post()` call.
 
-On subsequent **updates**, the existing `id` is read from the block attrs and reused so that previously saved field values are preserved and overwritten correctly.
+On subsequent **updates**, the existing `id` and `data` entries are read from the stored block attrs and the new values are merged on top, preserving any fields not included in the current call.
 
 ## Parameter
 

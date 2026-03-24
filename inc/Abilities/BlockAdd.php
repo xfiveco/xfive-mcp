@@ -119,9 +119,14 @@ class BlockAdd extends AbilitiesBase {
 			return new \WP_Error( 'acf_not_active', 'Advanced Custom Fields plugin is not active.' );
 		}
 
-		// Generate a block ID so ACF can associate field values with this block.
-		if ( ! empty( $acf_fields ) && empty( $args['attributes']['id'] ) ) {
-			$args['attributes']['id'] = AcfHelper::generate_block_id();
+		if ( ! empty( $acf_fields ) ) {
+			// Generate a block ID so ACF can identify this block instance.
+			if ( empty( $args['attributes']['id'] ) ) {
+				$args['attributes']['id'] = AcfHelper::generate_block_id();
+			}
+
+			// Inject ACF field values into attrs['data'] before serialisation.
+			$args['attributes'] = AcfHelper::merge_acf_data( $args['attributes'] ?? array(), $acf_fields );
 		}
 
 		$blocks    = parse_blocks( $post->post_content );
@@ -144,21 +149,12 @@ class BlockAdd extends AbilitiesBase {
 			return $result;
 		}
 
-		$block_id = AcfHelper::extract_block_id( $new_block );
-
-		if ( ! empty( $acf_fields ) && ! empty( $block_id ) ) {
-			$acf_result = AcfHelper::update_block_fields( $block_id, $acf_fields );
-
-			if ( is_wp_error( $acf_result ) ) {
-				return $acf_result;
-			}
-		}
-
 		$response = array(
 			'added'      => true,
 			'block_name' => $args['block'] ?? $args['blockName'] ?? '',
 		);
 
+		$block_id = AcfHelper::extract_block_id( $new_block );
 		if ( ! empty( $block_id ) ) {
 			$response['block_id'] = $block_id;
 		}
