@@ -3,6 +3,7 @@
 namespace XfiveMCP\Abilities;
 
 use XfiveMCP\Blocks\BlockRegistry;
+use XfiveMCP\Helpers\AcfHelper;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit; // Exit if accessed directly.
@@ -72,6 +73,11 @@ class BlockAdd extends AbilitiesBase {
 						'additionalProperties' => true,
 					),
 				),
+				'acf_fields'  => array(
+					'type'                 => 'object',
+					'description'          => 'ACF custom field values to save for the block. Keys are ACF field names, values are the data to store. Supports all ACF field types (text, image, repeater, group, etc.).',
+					'additionalProperties' => true,
+				),
 			),
 			'required'   => array( 'post_id', 'block' ),
 		);
@@ -101,11 +107,21 @@ class BlockAdd extends AbilitiesBase {
 	 * @return array|\WP_Error Result array or error.
 	 */
 	public function execute_callback( array $args = array() ) {
-		$post_id = absint( $args['post_id'] );
-		$post    = get_post( $post_id );
+		$post_id    = absint( $args['post_id'] );
+		$acf_fields = $args['acf_fields'] ?? array();
+		$post       = get_post( $post_id );
 
 		if ( ! $post ) {
 			return new \WP_Error( 'post_not_found', 'Post not found' );
+		}
+
+		if ( ! empty( $acf_fields ) && ! AcfHelper::is_acf_active() ) {
+			return new \WP_Error( 'acf_not_active', 'Advanced Custom Fields plugin is not active.' );
+		}
+
+		// Generate a block ID so ACF can associate field values with this block.
+		if ( ! empty( $acf_fields ) && empty( $args['attributes']['id'] ) ) {
+			$args['attributes']['id'] = AcfHelper::generate_block_id();
 		}
 
 		$blocks    = parse_blocks( $post->post_content );
@@ -128,9 +144,25 @@ class BlockAdd extends AbilitiesBase {
 			return $result;
 		}
 
-		return array(
+		$block_id = AcfHelper::extract_block_id( $new_block );
+
+		if ( ! empty( $acf_fields ) && ! empty( $block_id ) ) {
+			$acf_result = AcfHelper::update_block_fields( $block_id, $acf_fields );
+
+			if ( is_wp_error( $acf_result ) ) {
+				return $acf_result;
+			}
+		}
+
+		$response = array(
 			'added'      => true,
 			'block_name' => $args['block'] ?? $args['blockName'] ?? '',
 		);
+
+		if ( ! empty( $block_id ) ) {
+			$response['block_id'] = $block_id;
+		}
+
+		return $response;
 	}
 }

@@ -3,6 +3,7 @@
 namespace XfiveMCP\Abilities;
 
 use XfiveMCP\Blocks\BlockRegistry;
+use XfiveMCP\Helpers\AcfHelper;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit; // Exit if accessed directly.
@@ -77,6 +78,11 @@ class BlockReplace extends AbilitiesBase {
 						'additionalProperties' => true,
 					),
 				),
+				'acf_fields'  => array(
+					'type'                 => 'object',
+					'description'          => 'ACF custom field values to save for the replacement block. Keys are ACF field names, values are the data to store. Supports all ACF field types (text, image, repeater, group, etc.).',
+					'additionalProperties' => true,
+				),
 			),
 			'required'   => array( 'post_id', 'block_index', 'block' ),
 		);
@@ -116,10 +122,15 @@ class BlockReplace extends AbilitiesBase {
 	public function execute_callback( array $args = array() ): array|object {
 		$post_id     = absint( $args['post_id'] );
 		$block_index = absint( $args['block_index'] );
+		$acf_fields  = $args['acf_fields'] ?? array();
 		$post        = get_post( $post_id );
 
 		if ( ! $post ) {
 			return new \WP_Error( 'post_not_found', 'Post not found' );
+		}
+
+		if ( ! empty( $acf_fields ) && ! AcfHelper::is_acf_active() ) {
+			return new \WP_Error( 'acf_not_active', 'Advanced Custom Fields plugin is not active.' );
 		}
 
 		$blocks = parse_blocks( $post->post_content );
@@ -134,10 +145,16 @@ class BlockReplace extends AbilitiesBase {
 		// Get the old block name.
 		$old_block_name = $blocks[ $block_index ]['blockName'] ?? 'unknown';
 
-		// Build the new block data.
+		// Build the new block data, generating a fresh ID for ACF association.
+		$new_attrs = $args['attributes'] ?? array();
+
+		if ( ! empty( $acf_fields ) && empty( $new_attrs['id'] ) ) {
+			$new_attrs['id'] = AcfHelper::generate_block_id();
+		}
+
 		$new_block_data = array(
 			'block'       => $args['block'],
-			'attributes'  => $args['attributes'] ?? array(),
+			'attributes'  => $new_attrs,
 			'innerBlocks' => $args['innerBlocks'] ?? array(),
 		);
 
@@ -161,10 +178,26 @@ class BlockReplace extends AbilitiesBase {
 			return $result;
 		}
 
-		return array(
+		$block_id = AcfHelper::extract_block_id( $new_block );
+
+		if ( ! empty( $acf_fields ) && ! empty( $block_id ) ) {
+			$acf_result = AcfHelper::update_block_fields( $block_id, $acf_fields );
+
+			if ( is_wp_error( $acf_result ) ) {
+				return $acf_result;
+			}
+		}
+
+		$response = array(
 			'replaced'       => true,
 			'old_block_name' => $old_block_name,
 			'new_block_name' => $args['block'],
 		);
+
+		if ( ! empty( $block_id ) ) {
+			$response['block_id'] = $block_id;
+		}
+
+		return $response;
 	}
 }

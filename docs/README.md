@@ -15,6 +15,7 @@ This plugin exposes WordPress content management capabilities through MCP (Model
 - **[Blocks - Remove](BLOCKS_REMOVE.md)** - Delete blocks from posts
 - **[Blocks - Move](BLOCKS_MOVE.md)** - Reorder blocks within a post
 - **[Blocks - Tree](BLOCKS_TREE.md)** - View the block structure of a post
+- **[Blocks - ACF Fields](BLOCKS_ACF.md)** - Populate ACF custom fields on ACF-registered blocks
 
 ### Post Management
 
@@ -305,6 +306,7 @@ Common errors:
 - [Blocks - Remove](BLOCKS_REMOVE.md)
 - [Blocks - Move](BLOCKS_MOVE.md)
 - [Blocks - Tree](BLOCKS_TREE.md)
+- [Blocks - ACF Fields](BLOCKS_ACF.md)
 
 ### Post Abilities
 
