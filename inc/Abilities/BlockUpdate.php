@@ -3,6 +3,7 @@
 namespace XfiveMCP\Abilities;
 
 use XfiveMCP\Blocks\BlockRegistry;
+use XfiveMCP\Helpers\AcfHelper;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit; // Exit if accessed directly.
@@ -71,6 +72,11 @@ class BlockUpdate extends AbilitiesBase {
 						'additionalProperties' => true,
 					),
 				),
+				'acf_fields'  => array(
+					'type'                 => 'object',
+					'description'          => 'ACF custom field values to update for the block. Keys are ACF field names, values are the data to store. Supports all ACF field types (text, image, repeater, group, etc.).',
+					'additionalProperties' => true,
+				),
 			),
 			'required'   => array( 'post_id', 'block_index' ),
 		);
@@ -117,10 +123,15 @@ class BlockUpdate extends AbilitiesBase {
 	public function execute_callback( array $args = array() ): array|object {
 		$post_id     = absint( $args['post_id'] );
 		$block_index = absint( $args['block_index'] );
+		$acf_fields  = $args['acf_fields'] ?? array();
 		$post        = get_post( $post_id );
 
 		if ( ! $post ) {
 			return new \WP_Error( 'post_not_found', 'Post not found' );
+		}
+
+		if ( ! empty( $acf_fields ) && ! AcfHelper::is_acf_active() ) {
+			return new \WP_Error( 'acf_not_active', 'Advanced Custom Fields plugin is not active.' );
 		}
 
 		$blocks = parse_blocks( $post->post_content );
@@ -158,6 +169,16 @@ class BlockUpdate extends AbilitiesBase {
 			$args['attributes'] ?? array()
 		);
 
+		if ( ! empty( $acf_fields ) ) {
+			// Ensure the block has an ID for ACF to identify this block instance.
+			if ( empty( $new_attrs['id'] ) ) {
+				$new_attrs['id'] = AcfHelper::generate_block_id();
+			}
+
+			// Inject ACF field values into attrs['data'] before serialisation.
+			$new_attrs = AcfHelper::merge_acf_data( $new_attrs, $acf_fields );
+		}
+
 		// Handle inner blocks: if provided, replace; otherwise keep existing.
 		$new_inner_blocks_data = $args['innerBlocks'] ?? $existing_block['innerBlocks'] ?? array();
 
@@ -187,9 +208,16 @@ class BlockUpdate extends AbilitiesBase {
 			return $result;
 		}
 
-		return array(
+		$response = array(
 			'updated'    => true,
 			'block_name' => $new_block_name,
 		);
+
+		$block_id = AcfHelper::extract_block_id( $updated_block );
+		if ( ! empty( $block_id ) ) {
+			$response['block_id'] = $block_id;
+		}
+
+		return $response;
 	}
 }
