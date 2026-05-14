@@ -37,7 +37,7 @@ class BlockTree extends AbilitiesBase {
 	 * @return string Ability description.
 	 */
 	public function get_description(): string {
-		return 'Displays blocks tree for a post';
+		return 'Read-only inspection: parses post_content into a Gutenberg block tree (top-level blocks with attrs + innerBlocks). Use to discover what is currently on a page before editing — then send the full updated markup via xfive-posts-post-update-content. Empty whitespace-only blocks are stripped.';
 	}
 
 	/**
@@ -51,9 +51,10 @@ class BlockTree extends AbilitiesBase {
 			'properties' => array(
 				'post_id' => array(
 					'type'        => 'integer',
-					'description' => 'Post ID',
+					'description' => 'Post ID to read.',
 				),
 			),
+			'required'   => array( 'post_id' ),
 		);
 	}
 
@@ -64,9 +65,18 @@ class BlockTree extends AbilitiesBase {
 	 */
 	public function get_output_schema(): array {
 		return array(
-			'type'  => 'object',
-			'items' => array(
-				'type' => 'array',
+			'type'       => 'object',
+			'properties' => array(
+				'blocks' => array(
+					'type'        => 'array',
+					'description' => 'Ordered list of top-level blocks. Each block has blockName, attrs, innerBlocks, innerHTML.',
+					'items'       => array(
+						'type' => 'object',
+					),
+				),
+				'hint'   => array(
+					'type' => 'string',
+				),
 			),
 		);
 	}
@@ -78,28 +88,34 @@ class BlockTree extends AbilitiesBase {
 	 * @return array|\WP_Error Result array or error.
 	 */
 	public function execute_callback( array $args = array() ) {
-		$post = get_post( $args['post_id'] );
+		$post = get_post( $args['post_id'] ?? 0 );
 		if ( ! $post ) {
-			return new \WP_Error( 'not_found', 'Post not found' );
+			return array(
+				'blocks' => array(),
+				'hint'   => 'Post not found. Confirm post_id with xfive-posts-post-by-title (passing the matching post_type).',
+			);
 		}
 
 		$blocks = parse_blocks( $post->post_content );
-
-		if ( empty( $blocks ) ) {
-			return array();
-		}
-
-		$blocks = array_filter(
-			$blocks,
-			function ( $block ) {
-				return ! empty( $block['blockName'] );
-			}
+		$blocks = array_values(
+			array_filter(
+				$blocks,
+				static function ( $block ) {
+					return ! empty( $block['blockName'] );
+				}
+			)
 		);
 
 		if ( empty( $blocks ) ) {
-			return array();
+			return array(
+				'blocks' => array(),
+				'hint'   => 'Post has no blocks yet. Use xfive-posts-post-update-content to insert Gutenberg markup (run xfive-blocks-block-schema first for each block).',
+			);
 		}
 
-		return $blocks;
+		return array(
+			'blocks' => $blocks,
+			'hint'   => 'To modify, write the full new markup with xfive-posts-post-update-content (no partial-block tools available).',
+		);
 	}
 }

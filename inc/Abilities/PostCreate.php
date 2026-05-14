@@ -31,7 +31,7 @@ class PostCreate extends AbilitiesBase {
 	 * @return string The ability description.
 	 */
 	public function get_description(): string {
-		return 'Create a new post of any type (defaults to post).';
+		return 'Create a new post/page/CPT entry. Returns the new post_id. If post_content contains blocks, call xfive-blocks-block-schema for each block FIRST so attributes are valid. For pages the user should preview, set post_status to "publish" (default is "draft"). To populate ACF fields after creation, chain xfive-acf-acf-field-update.';
 	}
 
 	/**
@@ -77,7 +77,10 @@ class PostCreate extends AbilitiesBase {
 			'properties' => array(
 				'post_id' => array(
 					'type'        => 'integer',
-					'description' => 'The ID of the created post',
+					'description' => 'The ID of the created post.',
+				),
+				'hint'    => array(
+					'type' => 'string',
 				),
 			),
 		);
@@ -103,8 +106,20 @@ class PostCreate extends AbilitiesBase {
 			return $post_id;
 		}
 
+		$post_type = $post_data['post_type'];
+		$hint      = sprintf( 'Post created (%1$s, status: %2$s).', $post_type, $post_data['post_status'] );
+
+		if ( $post_data['post_status'] === 'draft' ) {
+			$hint .= ' Set post_status to "publish" if the user should preview it.';
+		}
+
+		if ( $post_type === 'page' ) {
+			$hint .= ' If this is the homepage, set show_on_front + page_on_front via xfive-options-options-update.';
+		}
+
 		return array(
 			'post_id' => $post_id,
+			'hint'    => $hint,
 		);
 	}
 }

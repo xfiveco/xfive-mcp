@@ -31,7 +31,7 @@ class PostGetContent extends AbilitiesBase {
 	 * @return string The ability description.
 	 */
 	public function get_description(): string {
-		return 'Retrieve the raw content of a post for review, spell-checking, grammar correction, or content analysis. Use only when asked for spelling or grammar check.';
+		return 'Get the raw post_content (Gutenberg block markup) of a post by ID. Use when you need the full markup string for editing — for a structured tree view of blocks use xfive-blocks-block-tree instead.';
 	}
 
 	/**
@@ -63,7 +63,10 @@ class PostGetContent extends AbilitiesBase {
 			'properties' => array(
 				'content' => array(
 					'type'        => 'string',
-					'description' => 'The raw post content for review, spell-checking, or editing',
+					'description' => 'Raw post_content as Gutenberg block markup.',
+				),
+				'hint'    => array(
+					'type' => 'string',
 				),
 			),
 		);
@@ -90,8 +93,13 @@ class PostGetContent extends AbilitiesBase {
 			return new \WP_Error( 'not_found', 'Post not found' );
 		}
 
+		$content = $post->post_content;
+
 		return array(
-			'content' => $post->post_content,
+			'content' => $content,
+			'hint'    => $content === ''
+				? 'Post is empty. Insert blocks with xfive-posts-post-update-content (call xfive-blocks-block-schema for each block first).'
+				: 'To edit, modify the markup string and write it back via xfive-posts-post-update-content.',
 		);
 	}
 }

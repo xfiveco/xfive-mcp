@@ -31,7 +31,7 @@ class PostByTitle extends AbilitiesBase {
 	 * @return string The ability description.
 	 */
 	public function get_description(): string {
-		return 'Retrieve a post ID by searching for its title.';
+		return 'Look up a post ID by its exact title. Pass the matching post_type — defaults to "page". Returns post_id: null when nothing matches (NOT an error) so you can chain follow-up actions like xfive-posts-post-create.';
 	}
 
 	/**
@@ -45,9 +45,15 @@ class PostByTitle extends AbilitiesBase {
 			'properties' => array(
 				'post_title' => array(
 					'type'        => 'string',
-					'description' => 'Post title',
+					'description' => 'Exact post title to match (case-sensitive).',
+				),
+				'post_type'  => array(
+					'type'        => 'string',
+					'description' => 'Post type to search within (e.g. "page", "post", "case-study", "team-member"). Defaults to "page".',
+					'default'     => 'page',
 				),
 			),
+			'required'   => array( 'post_title' ),
 		);
 	}
 
@@ -61,8 +67,11 @@ class PostByTitle extends AbilitiesBase {
 			'type'       => 'object',
 			'properties' => array(
 				'post_id' => array(
-					'type'        => 'integer',
-					'description' => 'The ID of the found post',
+					'type'        => array( 'integer', 'null' ),
+					'description' => 'The ID of the matched post, or null when no match was found.',
+				),
+				'hint'    => array(
+					'type' => 'string',
 				),
 			),
 		);
@@ -81,21 +90,31 @@ class PostByTitle extends AbilitiesBase {
 	 * @return array|\WP_Error Array with post_id on success, WP_Error if not found.
 	 */
 	public function execute_callback( array $args = array() ): array|object {
-		$query_args = array(
-			'fields'         => 'ids',
-			'post_type'      => 'any',
-			'posts_per_page' => 1,
-			'post_status'    => 'any',
-			'no_found_rows'  => true,
-			'title'          => sanitize_text_field( $args['post_title'] ),
+		$post_type = sanitize_text_field( $args['post_type'] ?? 'page' );
+		$title     = sanitize_text_field( $args['post_title'] );
+
+		$query = new \WP_Query(
+			array(
+				'fields'         => 'ids',
+				'post_type'      => $post_type,
+				'posts_per_page' => 1,
+				'post_status'    => 'any',
+				'no_found_rows'  => true,
+				'title'          => $title,
+			)
 		);
 
-		$query = new \WP_Query( $query_args );
-
 		if ( ! $query->have_posts() ) {
-				return new \WP_Error( 'not_found', 'Post not found' );
+			return array(
+				'post_id' => null,
+				'hint'    => sprintf(
+					'No %1$s with title "%2$s". Try another post_type (page/post/CPT slug like case-study, team-member) or create with xfive-posts-post-create.',
+					$post_type,
+					$title
+				),
+			);
 		}
 
-		return array( 'post_id' => $query->posts[0] );
+		return array( 'post_id' => (int) $query->posts[0] );
 	}
 }

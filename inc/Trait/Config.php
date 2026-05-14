@@ -15,11 +15,6 @@ trait Config {
 	private array $tools = array(
 		'xfive-blocks' => array(
 			'block-tree',
-			'block-add',
-			'block-update',
-			'block-remove',
-			'block-move',
-			'block-replace',
 			'block-schema',
 		),
 		'xfive-posts'  => array(
@@ -32,6 +27,21 @@ trait Config {
 		),
 		'xfive-images' => array(
 			'image-upload',
+		),
+		'xfive-menus'  => array(
+			'nav-menu-create',
+		),
+		'xfive-acf'     => array(
+			'acf-field-update',
+		),
+		'xfive-options' => array(
+			'options-update',
+		),
+		'xfive-widgets' => array(
+			'widgets-list',
+			'widget-add',
+			'widget-update',
+			'widget-remove',
 		),
 	);
 

@@ -1,63 +1,110 @@
-# xfive-mcp
-MCP server with Wordpress Abilities API
+# xfive-mcp — WordPress MCP server
 
-## Connection
+Exposes a focused set of WordPress content-management tools over the Model Context Protocol (MCP) so AI assistants can read and write posts, pages, ACF fields, options, menus, and media.
 
-The plugin uses Application Passwords to authenticate the llm as a wp user with admin privileges. 
+The canonical reference for each tool is its PHP class in `inc/Abilities/` — read the `get_description()`, `get_input_schema()`, and `get_output_schema()` methods. Each tool also returns a `hint` field in its output payload that points to likely next actions or common failure causes.
 
-To enable application passwords locally set environment type to local in your wp-config.php `define( 'WP_ENVIRONMENT_TYPE', 'local' );`
+## Design principles
 
-The below configuration is for Google Antigravity. Some AI tools can require "mcpServers" property to be "servers"
+- **Few, sharp tools.** No overlapping primitives. Block-level mutation tools were removed in favor of one path: read full content, modify the markup string, write full content back.
+- **Soft-fail with hints.** Where useful, tools return `null`/empty results plus a `hint` string instead of erroring — so the agent can chain follow-up actions without a round-trip through error handling.
+- **Schema-first.** Always call `block-schema` for each Gutenberg block before composing markup. Wrong attributes are silently dropped.
 
+## Available tools
+
+All tools register under the `xfive-mcp` server with REST namespace `xfive-mcp/v1` and route `mcp`. Each is grouped by category.
+
+### Blocks (read-only)
+
+| Tool | Purpose |
+|---|---|
+| `block-schema` | Get the registration schema (attributes + supports) for a block. Call BEFORE writing block markup. |
+| `block-tree` | Parse a post's `post_content` into a Gutenberg block tree (top-level blocks + their attrs/innerBlocks). |
+
+### Posts
+
+| Tool | Purpose |
+|---|---|
+| `post-by-title` | Look up a post ID by exact title + post_type. Returns `post_id: null` (not an error) when nothing matches. |
+| `post-create` | Create a new post / page / CPT entry. Returns the new `post_id`. |
+| `post-update` | Update post-level fields (title, status, optionally content). |
+| `post-update-content` | Replace `post_content` with new Gutenberg markup. The primary tool for ALL block edits. |
+| `post-get-content` | Read the raw `post_content` markup string. |
+| `post-trash` | Move a post to the trash (denied by default in `.claude/settings.json`). |
+
+### Media
+
+| Tool | Purpose |
+|---|---|
+| `image-upload` | Upload an image to the media library from a remote URL or a local filesystem path. Returns attachment `id` + `url`. |
+
+### Menus
+
+| Tool | Purpose |
+|---|---|
+| `nav-menu-create` | Create a nav menu, optionally assign to a theme location, optionally seed items (custom links, posts, taxonomies, nested). |
+
+### ACF
+
+| Tool | Purpose |
+|---|---|
+| `acf-field-update` | Update one or more ACF fields on a post or the ACF Options page (`post_id: "option"`). |
+
+### Options & theme mods
+
+| Tool | Purpose |
+|---|---|
+| `options-update` | Bulk-update `wp_options` rows (`type: "option"`) or theme mods (`type: "theme_mod"`). |
+
+### Widgets
+
+| Tool | Purpose |
+|---|---|
+| `widgets-list` | List all sidebars and the widgets assigned to each. |
+| `widget-add` | Add a widget to a sidebar. |
+| `widget-update` | Update a widget's settings. |
+| `widget-remove` | Remove a widget from a sidebar. |
+
+## Editing block content — the only flow
+
+There are no partial-block mutation tools (block-add / update / replace / move / remove were removed; index-based mutation was fragile). To edit any block content:
+
+1. Optional: `block-tree` (inspect current structure) or `post-get-content` (raw markup string).
+2. `block-schema` for every block type you're about to write (validates attribute shape).
+3. `post-update-content` with the full new Gutenberg markup.
+
+Round-trip cost is small in practice and produces predictable, debuggable diffs.
+
+## Authentication
+
+The MCP REST endpoint uses HTTP Basic Auth with WordPress application passwords. For local development, define `MCP_OPEN` truthy in `wp-config.php` to bypass auth and run as the first administrator user (already configured in this site).
+
+## Architecture
+
+```php
+inc/
+├── Abilities/             # One class per MCP tool, all extend AbilitiesBase
+│   ├── AbilitiesBase.php
+│   ├── BlockSchema.php
+│   ├── BlockTree.php
+│   ├── PostByTitle.php
+│   ├── PostCreate.php
+│   ├── PostUpdate.php
+│   ├── PostUpdateContent.php
+│   ├── PostGetContent.php
+│   ├── PostTrash.php
+│   ├── ImageUpload.php
+│   ├── NavMenuCreate.php
+│   ├── AcfFieldUpdate.php
+│   ├── OptionsUpdate.php
+│   └── Widget{sList,Add,Update,Remove}.php
+├── WP/
+│   ├── Plugin.php         # Bootstrap (singleton)
+│   ├── Abilities.php      # Registers each ability with wp_register_ability()
+│   └── MCP.php            # Creates the MCP server via mcp_adapter_init
+└── Trait/
+    ├── Singleton.php
+    └── Config.php         # Inventory of which tools live in which category
 ```
-{
-  "mcpServers": {
-    "xfive-mcp": {
-      "command": "npx",
-      "args": [
-        "-y",
-        "@automattic/mcp-wordpress-remote"
-      ],
-      "env": {
-        "WP_API_URL": "http://your-wp-site.com/wp-json/xfive-mcp/mcp",
-        "WP_API_USERNAME": "YOUR USERNAME, e.g MCP Adapter",
-        "WP_API_PASSWORD": "YOUR APPLICATIONS PASSWORD"
-      },
-      "disabledTools": [],
-      "disabled": false
-    },
-  }
-}
-```
 
-In local development you can bypass the authorization by defining `define( 'MCP_OPEN', true );` in your wp-config.php.
-
-## Available tools:
-
-**xfive-blocks-block-tree** - Displays blocks tree for a post
-
-**xfive-blocks-block-add** - Add blocks to a post. Check block-schema for blocks structure.
-
-**xfive-blocks-block-update** - Modify attributes and content of an existing block within a post. Use when asked for block editing. Check block-schema for blocks structure.
-
-**xfive-blocks-block-remove** - Remove a block from a post
-
-**xfive-blocks-block-move** - Move a block to a different position in a post
-
-**xfive-blocks-block-replace** - Replace a block with a completely new block
-
-**xfive-blocks-block-schema** - Retrieve the schema and configuration for a specific block.
-
-**xfive-posts-post-by-title** - Retrieve a post ID by searching for its title.
-
-**xfive-posts-post-get-content** - Retrieve the raw content of a post for review, spell-checking, grammar correction, or content analysis. Use only when asked for spelling or grammar check.
-
-**xfive-posts-post-update-content** - Update post content with corrected text after spell-checking, grammar review, or content editing. Use only when asked for spelling or grammar check.
-
-**xfive-posts-post-create** - Create a new post of any type (defaults to post).
-
-**xfive-posts-post-update** - Update an existing post (title, content, status, etc.).
-
-**xfive-posts-post-trash** - Move a post to the trash.
-
-**xfive-images-image-upload** - Upload an image to the media library. Provide either image_url (remote URL) or local_path (absolute path to a local file).
+Tool registration is data-driven from `Trait/Config.php`: add an entry there, create the matching class in `inc/Abilities/`, and `Abilities::register_abilities()` picks it up on `wp_abilities_api_init`.

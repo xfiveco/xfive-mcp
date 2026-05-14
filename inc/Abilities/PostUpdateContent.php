@@ -31,7 +31,7 @@ class PostUpdateContent extends AbilitiesBase {
 	 * @return string The ability description.
 	 */
 	public function get_description(): string {
-		return 'Update post content with corrected text after spell-checking, grammar review, or content editing. Use only when asked for spelling or grammar check.';
+		return 'Replace the entire post_content of an existing post with new Gutenberg block markup. Use this for ALL block-content edits (creating sections, reordering, removing, fixing typos in seeded data) — write the full new markup and send it once. Always call xfive-blocks-block-schema for every block first to validate attribute shape. For blank/empty content pass an empty string.';
 	}
 
 	/**
@@ -45,11 +45,11 @@ class PostUpdateContent extends AbilitiesBase {
 			'properties' => array(
 				'post_id' => array(
 					'type'        => 'integer',
-					'description' => 'Post ID',
+					'description' => 'Post ID to update.',
 				),
 				'content' => array(
 					'type'        => 'string',
-					'description' => 'The corrected post content (after spell-checking, grammar review, or editing)',
+					'description' => 'Full Gutenberg block markup to set as the new post_content. Will completely replace existing content. Pass "" to clear.',
 				),
 			),
 			'required'   => array( 'post_id', 'content' ),
@@ -67,7 +67,10 @@ class PostUpdateContent extends AbilitiesBase {
 			'properties' => array(
 				'updated' => array(
 					'type'        => 'boolean',
-					'description' => 'Whether the post was updated successfully',
+					'description' => 'Whether the post was updated successfully.',
+				),
+				'hint'    => array(
+					'type' => 'string',
 				),
 			),
 		);
@@ -108,6 +111,7 @@ class PostUpdateContent extends AbilitiesBase {
 
 		return array(
 			'updated' => true,
+			'hint'    => 'Verify with xfive-blocks-block-tree (post_id) or load the post URL in a browser. If a block did not render, run xfive-blocks-block-schema and check that all attributes match the schema.',
 		);
 	}
 }

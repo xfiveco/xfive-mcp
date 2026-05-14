@@ -32,7 +32,7 @@ class BlockSchema extends AbilitiesBase {
 	 * @return string The ability description.
 	 */
 	public function get_description(): string {
-		return 'Retrieve the schema and configuration for a specific block.';
+		return 'Retrieve the registration schema (attributes + supports) for a single block by its full name. ALWAYS call this before inserting block markup so attribute keys match exactly. Chisel ACF blocks use prefix "chisel/" not "acf/" (e.g. chisel/team-members, NOT acf/team-members).';
 	}
 
 	/**
@@ -46,9 +46,10 @@ class BlockSchema extends AbilitiesBase {
 			'properties' => array(
 				'block_name' => array(
 					'type'        => 'string',
-					'description' => 'Block name (e.g., core/paragraph)',
+					'description' => 'Full block name with namespace, e.g. "core/paragraph", "chisel/team-members". Chisel ACF blocks use "chisel/", NEVER "acf/".',
 				),
 			),
+			'required'   => array( 'block_name' ),
 		);
 	}
 
@@ -61,35 +62,32 @@ class BlockSchema extends AbilitiesBase {
 		return array(
 			'type'       => 'object',
 			'properties' => array(
-				'block' => array(
+				'name'        => array(
+					'type'        => 'string',
+					'description' => 'Full block name (e.g. core/paragraph).',
+				),
+				'title'       => array(
+					'type'        => 'string',
+					'description' => 'Block display title.',
+				),
+				'category'    => array(
+					'type'        => 'string',
+					'description' => 'Block category.',
+				),
+				'description' => array(
+					'type'        => 'string',
+					'description' => 'Block description.',
+				),
+				'attributes'  => array(
 					'type'        => 'object',
-					'description' => 'Block schema',
-					'properties'  => array(
-						'name'        => array(
-							'type'        => 'string',
-							'description' => 'Block name (e.g., core/paragraph)',
-						),
-						'title'       => array(
-							'type'        => 'string',
-							'description' => 'Block display title',
-						),
-						'category'    => array(
-							'type'        => 'string',
-							'description' => 'Block category',
-						),
-						'description' => array(
-							'type'        => 'string',
-							'description' => 'Block description',
-						),
-						'attributes'  => array(
-							'type'        => 'object',
-							'description' => 'Block attributes schema',
-						),
-						'supports'    => array(
-							'type'        => 'object',
-							'description' => 'Block editor supports',
-						),
-					),
+					'description' => 'Block attributes schema (name => { type, default, enum? }).',
+				),
+				'supports'    => array(
+					'type'        => 'object',
+					'description' => 'Block editor supports.',
+				),
+				'hint'        => array(
+					'type' => 'string',
 				),
 			),
 		);
@@ -108,16 +106,30 @@ class BlockSchema extends AbilitiesBase {
 	 * @return array Array containing blocks data and count.
 	 */
 	public function execute_callback( array $args = array() ): array {
-		if ( ! class_exists( '\WP_Block_Type_Registry' ) ) {
-			return array();
+		$block_name = $args['block_name'] ?? '';
+
+		if ( ! class_exists( '\WP_Block_Type_Registry' ) || empty( $block_name ) ) {
+			return array(
+				'hint' => 'block_name is required (e.g. "core/paragraph", "chisel/values").',
+			);
 		}
 
 		$registry   = \WP_Block_Type_Registry::get_instance();
-		$block_name = $args['block_name'] ?? '';
 		$block_type = $registry->get_registered( $block_name );
 
 		if ( ! $block_type ) {
-			return array();
+			$hint = sprintf( 'Block "%s" is not registered. ', $block_name );
+
+			if ( strpos( $block_name, 'acf/' ) === 0 ) {
+				$alt   = 'chisel/' . substr( $block_name, 4 );
+				$hint .= sprintf( 'Chisel ACF blocks use the "chisel/" prefix — try "%s".', $alt );
+			} elseif ( strpos( $block_name, 'chisel/' ) === 0 ) {
+				$hint .= 'If the block was just created, ask the user to run `npm run build-scripts` so block.json is copied to build/ — then retry.';
+			} else {
+				$hint .= 'Check the namespace prefix (core/, chisel/, etc.) and confirm the slug matches block.json "name".';
+			}
+
+			return array( 'hint' => $hint );
 		}
 
 		$block_data = array(

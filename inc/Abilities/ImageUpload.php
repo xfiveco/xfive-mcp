@@ -31,7 +31,7 @@ class ImageUpload extends AbilitiesBase {
 	 * @return string The ability description.
 	 */
 	public function get_description(): string {
-		return 'Upload an image to the media library. Provide either image_url (remote URL) or local_path (absolute path to a local file).';
+		return 'Upload an image to the WordPress media library and return its attachment ID + URL. Provide ONE of: image_url (remote URL, will download) OR local_path (absolute filesystem path). Allowed types: jpeg, png, gif, webp, svg. Use the returned id as a featured image, ACF image field value, or block attribute.';
 	}
 
 	/**
@@ -45,11 +45,11 @@ class ImageUpload extends AbilitiesBase {
 			'properties' => array(
 				'image_url'  => array(
 					'type'        => 'string',
-					'description' => 'The URL of the image to upload (remote)',
+					'description' => 'Remote URL to download (http/https). Mutually exclusive with local_path.',
 				),
 				'local_path' => array(
 					'type'        => 'string',
-					'description' => 'Absolute path to a local image file to upload',
+					'description' => 'Absolute filesystem path on the server. Mutually exclusive with image_url.',
 				),
 			),
 		);
@@ -64,9 +64,20 @@ class ImageUpload extends AbilitiesBase {
 		return array(
 			'type'       => 'object',
 			'properties' => array(
-				'updated' => array(
-					'type'        => 'boolean',
-					'description' => 'Whether the post was updated successfully',
+				'id'    => array(
+					'type'        => 'integer',
+					'description' => 'Attachment ID of the uploaded image (use this as the value for image fields, _thumbnail_id, etc.).',
+				),
+				'url'   => array(
+					'type'        => 'string',
+					'description' => 'Public URL of the uploaded image at "large" size.',
+				),
+				'error' => array(
+					'type'        => 'string',
+					'description' => 'Present only on failure; describes what went wrong.',
+				),
+				'hint'  => array(
+					'type' => 'string',
 				),
 			),
 		);
@@ -83,14 +94,37 @@ class ImageUpload extends AbilitiesBase {
 		$local_path = $args['local_path'] ?? '';
 
 		if ( $local_path ) {
-			return $this->upload_image_from_local_path( $local_path );
+			return $this->annotate_result( $this->upload_image_from_local_path( $local_path ) );
 		}
 
 		if ( ! $image_url ) {
-			return new \WP_Error( 'not_found', 'Provide either image_url or local_path' );
+			return array(
+				'error' => 'Provide either image_url or local_path.',
+				'hint'  => 'Pass image_url for remote downloads (http/https) or local_path for an absolute filesystem path.',
+			);
 		}
 
-		return $this->upload_image_from_url( $image_url );
+		return $this->annotate_result( $this->upload_image_from_url( $image_url ) );
+	}
+
+	/**
+	 * Add a hint string to a successful or failed upload result.
+	 *
+	 * @param array|object $result Result from one of the uploader methods.
+	 * @return array|object
+	 */
+	private function annotate_result( $result ) {
+		if ( ! is_array( $result ) ) {
+			return $result;
+		}
+
+		if ( isset( $result['error'] ) ) {
+			$result['hint'] = 'Check file is jpg/png/gif/webp/svg, readable, and under PHP upload limits. For SVG you may need a plugin that allows SVG uploads.';
+		} elseif ( isset( $result['id'] ) ) {
+			$result['hint'] = sprintf( 'Attachment %d ready. Use as featured image with _thumbnail_id (via xfive-acf-acf-field-update), as ACF image field value (just the integer ID), or as block markup id.', (int) $result['id'] );
+		}
+
+		return $result;
 	}
 
 	/**
@@ -139,10 +173,11 @@ class ImageUpload extends AbilitiesBase {
 		if ( strpos( $file_name, '.' ) === false ) {
 			$mime_type  = mime_content_type( $temp_file );
 			$extensions = array(
-				'image/jpeg' => 'jpg',
-				'image/png'  => 'png',
-				'image/gif'  => 'gif',
-				'image/webp' => 'webp',
+				'image/jpeg'    => 'jpg',
+				'image/png'     => 'png',
+				'image/gif'     => 'gif',
+				'image/webp'    => 'webp',
+				'image/svg+xml' => 'svg',
 			);
 
 			if ( isset( $extensions[ $mime_type ] ) ) {
@@ -228,7 +263,7 @@ class ImageUpload extends AbilitiesBase {
 		$file_name = basename( $local_path );
 		$mime_type = mime_content_type( $local_path );
 
-		$allowed_mime_types = array( 'image/jpeg', 'image/png', 'image/gif', 'image/webp' );
+		$allowed_mime_types = array( 'image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml' );
 		if ( ! in_array( $mime_type, $allowed_mime_types, true ) ) {
 			return array( 'error' => 'Unsupported image type: ' . sanitize_text_field( $mime_type ) );
 		}

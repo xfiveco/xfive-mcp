@@ -31,7 +31,7 @@ class PostUpdate extends AbilitiesBase {
 	 * @return string The ability description.
 	 */
 	public function get_description(): string {
-		return 'Update an existing post (title, content, status, etc.).';
+		return 'Update post-level fields (title, status, optionally content) on an existing post. For block content updates, prefer xfive-posts-post-update-content (clearer intent + same effect on post_content). Pass only the fields you want to change.';
 	}
 
 	/**
@@ -75,7 +75,10 @@ class PostUpdate extends AbilitiesBase {
 			'properties' => array(
 				'updated' => array(
 					'type'        => 'boolean',
-					'description' => 'Whether the post was updated successfully',
+					'description' => 'Whether the post was updated successfully.',
+				),
+				'hint'    => array(
+					'type' => 'string',
 				),
 			),
 		);
@@ -117,8 +120,14 @@ class PostUpdate extends AbilitiesBase {
 			return $result;
 		}
 
+		$hint = 'Updated.';
+		if ( isset( $args['post_content'] ) ) {
+			$hint .= ' For block content edits prefer xfive-posts-post-update-content next time — single-purpose tool, same effect.';
+		}
+
 		return array(
 			'updated' => true,
+			'hint'    => $hint,
 		);
 	}
 }
