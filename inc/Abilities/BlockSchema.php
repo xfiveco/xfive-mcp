@@ -86,6 +86,14 @@ class BlockSchema extends AbilitiesBase {
 					'type'        => 'object',
 					'description' => 'Block editor supports.',
 				),
+				'renderMode'  => array(
+					'type'        => 'string',
+					'description' => '"dynamic" (server render_callback, e.g. ACF blocks or core/latest-posts) or "static" (client save() returns JSX, e.g. core/paragraph, custom WP blocks).',
+				),
+				'seedAs'      => array(
+					'type'        => 'string',
+					'description' => 'Required block-comment shape when writing markup. Static blocks MUST be seeded as opening+closing tags with the rendered inner HTML between them. Only dynamic blocks may be self-closing.',
+				),
 				'hint'        => array(
 					'type' => 'string',
 				),
@@ -157,6 +165,12 @@ class BlockSchema extends AbilitiesBase {
 		if ( isset( $block_type->supports ) && is_array( $block_type->supports ) ) {
 			$block_data['supports'] = $block_type->supports;
 		}
+
+		$is_dynamic               = ! empty( $block_type->render_callback );
+		$block_data['renderMode'] = $is_dynamic ? 'dynamic' : 'static';
+		$block_data['seedAs']     = $is_dynamic
+			? 'Self-closing OK: <!-- wp:' . $block_name . ' {ATTRS} /-->'
+			: 'MUST be paired with rendered inner HTML: <!-- wp:' . $block_name . ' {ATTRS} -->INNER_HTML<!-- /wp:' . $block_name . ' -->. Self-closing form will trigger "Block validation failed" in the editor.';
 
 		return $block_data;
 	}
