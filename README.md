@@ -79,6 +79,51 @@ Round-trip cost is small in practice and produces predictable, debuggable diffs.
 
 The MCP REST endpoint uses HTTP Basic Auth with WordPress application passwords. For local development, define `MCP_OPEN` truthy in `wp-config.php` to bypass auth and run as the first administrator user (already configured in this site).
 
+```php
+define( 'MCP_OPEN', true );
+```
+
+## Client configuration
+
+The server is reached over HTTP via the [`@automattic/mcp-wordpress-remote`](https://www.npmjs.com/package/@automattic/mcp-wordpress-remote) proxy, which bridges stdio MCP clients to the WordPress REST endpoint.
+
+### Claude Code (`.mcp.json`)
+
+Drop a `.mcp.json` at the project root:
+
+```json
+{
+  "mcpServers": {
+    "xfive-mcp-chisel": {
+      "command": "npx",
+      "args": ["-y", "@automattic/mcp-wordpress-remote"],
+      "env": {
+        "WP_API_URL": "http://your-site.test/wp-json/xfive-mcp/mcp"
+      }
+    }
+  }
+}
+```
+
+`WP_API_URL` points at this plugin's route (`xfive-mcp/v1` namespace → `mcp` route).
+
+### Authentication options
+
+- **`MCP_OPEN` mode (local dev).** When `define( 'MCP_OPEN', true )` is set in `wp-config.php`, the endpoint accepts unauthenticated requests and runs as the first admin. Omit `WP_API_USERNAME` / `WP_API_PASSWORD` — they're not needed.
+- **Application passwords (staging / shared).** Generate one at *Users → Profile → Application Passwords* and add:
+
+  ```json
+  "env": {
+    "WP_API_URL": "http://your-site.test/wp-json/xfive-mcp/mcp",
+    "WP_API_USERNAME": "your-username",
+    "WP_API_PASSWORD": "your-application-password"
+  }
+  ```
+
+### Other coding tools
+
+Other MCP-capable clients (Codex, Cursor, Windsurf, Cline, Zed, etc.) use the same proxy `command` / `args` / `env` block, but each reads it from its own config file and may wrap it in a different top-level schema. Check the tool's MCP docs for the exact filename and structure — the inner server definition is portable.
+
 ## Architecture
 
 ```php
