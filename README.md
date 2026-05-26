@@ -95,11 +95,8 @@ Drop a `.mcp.json` at the project root:
 {
   "mcpServers": {
     "xfive-mcp-chisel": {
-      "command": "npx",
-      "args": ["-y", "@automattic/mcp-wordpress-remote"],
-      "env": {
-        "WP_API_URL": "http://your-site.test/wp-json/xfive-mcp/mcp"
-      }
+      "type": "http",
+      "url": "http://chisel-ai-mcp-test.test/wp-json/xfive-mcp/mcp"
     }
   }
 }
