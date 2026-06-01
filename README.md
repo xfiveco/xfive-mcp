@@ -38,7 +38,6 @@ All tools register under the `xfive-mcp` server with REST namespace `xfive-mcp/v
 | Tool | Purpose |
 |---|---|
 | `image-upload` | Upload an image to the media library from a remote URL or a local filesystem path. Returns attachment `id` + `url`. |
-| `image-upload-data` | Upload an image from raw base64-encoded bytes — use when the file lives only on the caller's machine. Keep payloads small (logos/icons); prefer `image-upload` with a URL for large files. |
 
 ### Menus
 

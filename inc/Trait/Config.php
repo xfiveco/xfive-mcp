@@ -28,7 +28,6 @@ trait Config {
 		),
 		'xfive-images' => array(
 			'image-upload',
-			'image-upload-data',
 		),
 		'xfive-menus'  => array(
 			'nav-menu-create',
