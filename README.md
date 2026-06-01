@@ -30,6 +30,7 @@ All tools register under the `xfive-mcp` server with REST namespace `xfive-mcp/v
 | `post-update` | Update post-level fields (title, status, optionally content). |
 | `post-update-content` | Replace `post_content` with new Gutenberg markup. The primary tool for ALL block edits. |
 | `post-get-content` | Read the raw `post_content` markup string. |
+| `post-get-meta` | Read raw post meta (`postmeta` table). Omit `keys` for all keys, or pass an array for specific ones. For ACF fields prefer `acf-field-get`. |
 | `post-trash` | Move a post to the trash (denied by default in `.claude/settings.json`). |
 
 ### Media
@@ -37,18 +38,21 @@ All tools register under the `xfive-mcp` server with REST namespace `xfive-mcp/v
 | Tool | Purpose |
 |---|---|
 | `image-upload` | Upload an image to the media library from a remote URL or a local filesystem path. Returns attachment `id` + `url`. |
+| `image-upload-data` | Upload an image from raw base64-encoded bytes — use when the file lives only on the caller's machine. Keep payloads small (logos/icons); prefer `image-upload` with a URL for large files. |
 
 ### Menus
 
 | Tool | Purpose |
 |---|---|
 | `nav-menu-create` | Create a nav menu, optionally assign to a theme location, optionally seed items (custom links, posts, taxonomies, nested). |
+| `nav-menu-list` | List all nav menus with their items, theme locations, and item hierarchy. Pass `menu` (term ID, name, or slug) to return just one. Read counterpart to `nav-menu-create`. |
 
 ### ACF
 
 | Tool | Purpose |
 |---|---|
 | `acf-field-update` | Update one or more ACF fields on a post or the ACF Options page (`post_id: "option"`). |
+| `acf-field-get` | Read ACF field values from a post or the Options page. Omit `fields` for all fields. Returns per-field `meta` (type, textarea `new_lines` mode, and a `raw` plain-text value for textareas storing render HTML). Read counterpart to `acf-field-update`. |
 
 ### Options & theme mods
 
@@ -134,10 +138,14 @@ inc/
 │   ├── PostUpdate.php
 │   ├── PostUpdateContent.php
 │   ├── PostGetContent.php
+│   ├── PostGetMeta.php
 │   ├── PostTrash.php
 │   ├── ImageUpload.php
+│   ├── ImageUploadData.php
 │   ├── NavMenuCreate.php
+│   ├── NavMenuList.php
 │   ├── AcfFieldUpdate.php
+│   ├── AcfFieldGet.php
 │   ├── OptionsUpdate.php
 │   └── Widget{sList,Add,Update,Remove}.php
 ├── WP/

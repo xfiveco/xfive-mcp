@@ -20,6 +20,7 @@ trait Config {
 		'xfive-posts'  => array(
 			'post-by-title',
 			'post-get-content',
+			'post-get-meta',
 			'post-update-content',
 			'post-create',
 			'post-update',
@@ -27,12 +28,15 @@ trait Config {
 		),
 		'xfive-images' => array(
 			'image-upload',
+			'image-upload-data',
 		),
 		'xfive-menus'  => array(
 			'nav-menu-create',
+			'nav-menu-list',
 		),
 		'xfive-acf'     => array(
 			'acf-field-update',
+			'acf-field-get',
 		),
 		'xfive-options' => array(
 			'options-update',
