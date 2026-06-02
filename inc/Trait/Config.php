@@ -37,6 +37,12 @@ trait Config {
 			'acf-field-update',
 			'acf-field-get',
 		),
+		'xfive-terms'   => array(
+			'term-list',
+			'term-create',
+			'term-update',
+			'term-delete',
+		),
 		'xfive-options' => array(
 			'options-update',
 		),

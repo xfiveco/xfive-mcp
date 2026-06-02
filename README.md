@@ -53,6 +53,15 @@ All tools register under the `xfive-mcp` server with REST namespace `xfive-mcp/v
 | `acf-field-update` | Update one or more ACF fields on a post or the ACF Options page (`post_id: "option"`). |
 | `acf-field-get` | Read ACF field values from a post or the Options page. Omit `fields` for all fields. Returns per-field `meta` (type, textarea `new_lines` mode, and a `raw` plain-text value for textareas storing render HTML). Read counterpart to `acf-field-update`. |
 
+### Terms
+
+| Tool | Purpose |
+|---|---|
+| `term-list` | List terms in a taxonomy (id, name, slug, parent, count). Optional `search` and `hide_empty`. Read counterpart to the term mutation tools — use to read term IDs back before assigning them (e.g. to an ACF taxonomy field). |
+| `term-create` | Create a taxonomy term (`name` + `taxonomy` required; `slug`, `description`, `parent` optional). Returns the existing `term_id` (not an error) if the name already exists. |
+| `term-update` | Update an existing term (`term_id` + `taxonomy` required). Only the provided fields (`name`, `slug`, `description`, `parent`) change. |
+| `term-delete` | Delete a term by ID (`term_id` + `taxonomy` required). Unassigns it from posts; does not delete the posts. |
+
 ### Options & theme mods
 
 | Tool | Purpose |
@@ -140,11 +149,11 @@ inc/
 │   ├── PostGetMeta.php
 │   ├── PostTrash.php
 │   ├── ImageUpload.php
-│   ├── ImageUploadData.php
 │   ├── NavMenuCreate.php
 │   ├── NavMenuList.php
 │   ├── AcfFieldUpdate.php
 │   ├── AcfFieldGet.php
+│   ├── Term{List,Create,Update,Delete}.php
 │   ├── OptionsUpdate.php
 │   └── Widget{sList,Add,Update,Remove}.php
 ├── WP/
