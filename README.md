@@ -30,7 +30,6 @@ All tools register under the `xfive-mcp` server with REST namespace `xfive-mcp/v
 | `post-update` | Update post-level fields (title, status, optionally content). |
 | `post-update-content` | Replace `post_content` with new Gutenberg markup. The primary tool for ALL block edits. |
 | `post-get-content` | Read the raw `post_content` markup string. |
-| `post-get-meta` | Read raw post meta (`postmeta` table). Omit `keys` for all keys, or pass an array for specific ones. For ACF fields prefer `acf-field-get`. |
 | `post-trash` | Move a post to the trash (denied by default in `.claude/settings.json`). |
 
 ### Media
@@ -38,29 +37,19 @@ All tools register under the `xfive-mcp` server with REST namespace `xfive-mcp/v
 | Tool | Purpose |
 |---|---|
 | `image-upload` | Upload an image to the media library from a remote URL or a local filesystem path. Returns attachment `id` + `url`. |
+| `media-migrate` | Push an existing media file (image or video) from THIS site to a remote WordPress site (e.g. local → staging), server-to-server. Reads the attachment from disk and POSTs it to the remote's built-in `wp/v2/media` endpoint with an application password. The agent passes only `attachment_id` — file bytes never travel through the agent. Returns the **remote** attachment `id` + `url`. See [Media migration](#media-migration-media-migrate) below for required config. |
 
 ### Menus
 
 | Tool | Purpose |
 |---|---|
 | `nav-menu-create` | Create a nav menu, optionally assign to a theme location, optionally seed items (custom links, posts, taxonomies, nested). |
-| `nav-menu-list` | List all nav menus with their items, theme locations, and item hierarchy. Pass `menu` (term ID, name, or slug) to return just one. Read counterpart to `nav-menu-create`. |
 
 ### ACF
 
 | Tool | Purpose |
 |---|---|
 | `acf-field-update` | Update one or more ACF fields on a post or the ACF Options page (`post_id: "option"`). |
-| `acf-field-get` | Read ACF field values from a post or the Options page. Omit `fields` for all fields. Returns per-field `meta` (type, textarea `new_lines` mode, and a `raw` plain-text value for textareas storing render HTML). Read counterpart to `acf-field-update`. |
-
-### Terms
-
-| Tool | Purpose |
-|---|---|
-| `term-list` | List terms in a taxonomy (id, name, slug, parent, count). Optional `search` and `hide_empty`. Read counterpart to the term mutation tools — use to read term IDs back before assigning them (e.g. to an ACF taxonomy field). |
-| `term-create` | Create a taxonomy term (`name` + `taxonomy` required; `slug`, `description`, `parent` optional). Returns the existing `term_id` (not an error) if the name already exists. |
-| `term-update` | Update an existing term (`term_id` + `taxonomy` required). Only the provided fields (`name`, `slug`, `description`, `parent`) change. |
-| `term-delete` | Delete a term by ID (`term_id` + `taxonomy` required). Unassigns it from posts; does not delete the posts. |
 
 ### Options & theme mods
 
@@ -86,6 +75,26 @@ There are no partial-block mutation tools (block-add / update / replace / move /
 3. `post-update-content` with the full new Gutenberg markup.
 
 Round-trip cost is small in practice and produces predictable, debuggable diffs.
+
+## Media migration (`media-migrate`)
+
+`media-migrate` follows the WP Migrate DB Pro push model: it runs on the **source** site (e.g. local), reads an attachment from disk, and POSTs it server-to-server to the **remote** site's built-in `wp/v2/media` REST endpoint. The agent passes only `attachment_id`, so file bytes never pass through the agent's context.
+
+Because the source site makes the outbound HTTP call itself (it is not the authenticated MCP caller), it must hold the remote's credentials. Configure them **once** on the source site's `wp-config.php`:
+
+```php
+define( 'XFIVE_MCP_REMOTE_URL', 'https://staging.example.com' );
+define( 'XFIVE_MCP_REMOTE_USER', 'your-remote-username' );
+define( 'XFIVE_MCP_REMOTE_APP_PASSWORD', 'xxxx xxxx xxxx xxxx xxxx xxxx' );
+```
+
+The application password is generated on the **remote** site at *Users → Profile → Application Passwords*; that user needs the `upload_files` capability. The remote site must be reachable over HTTP from the source server.
+
+Notes:
+
+- Allowed types: jpeg, png, gif, webp, svg, mp4, webm, ogg, mov.
+- The file is sent in a single request, so large files (video) are bound by the remote's `upload_max_filesize`, `post_max_size`, and `memory_limit` (HTTP 413 indicates the limit was hit).
+- The remote regenerates its own thumbnail/size variants; only the original file is transferred.
 
 ## Authentication
 
@@ -146,14 +155,11 @@ inc/
 │   ├── PostUpdate.php
 │   ├── PostUpdateContent.php
 │   ├── PostGetContent.php
-│   ├── PostGetMeta.php
 │   ├── PostTrash.php
 │   ├── ImageUpload.php
+│   ├── MediaMigrate.php
 │   ├── NavMenuCreate.php
-│   ├── NavMenuList.php
 │   ├── AcfFieldUpdate.php
-│   ├── AcfFieldGet.php
-│   ├── Term{List,Create,Update,Delete}.php
 │   ├── OptionsUpdate.php
 │   └── Widget{sList,Add,Update,Remove}.php
 ├── WP/
