@@ -100,17 +100,15 @@ class TermList extends AbilitiesBase {
 	public function execute_callback( array $args = array() ): array|object {
 		$taxonomy = $args['taxonomy'] ?? '';
 
-		if ( empty( $taxonomy ) ) {
-			return new \WP_Error( 'missing_param', 'taxonomy is required.' );
-		}
-
-		if ( ! taxonomy_exists( $taxonomy ) ) {
-			return new \WP_Error( 'invalid_taxonomy', sprintf( 'Taxonomy "%s" is not registered.', $taxonomy ) );
+		$invalid = $this->validate_taxonomy( $taxonomy );
+		if ( $invalid instanceof \WP_Error ) {
+			return $invalid;
 		}
 
 		$query_args = array(
-			'taxonomy'   => $taxonomy,
-			'hide_empty' => ! empty( $args['hide_empty'] ),
+			'taxonomy'               => $taxonomy,
+			'hide_empty'             => ! empty( $args['hide_empty'] ),
+			'update_term_meta_cache' => false,
 		);
 
 		if ( ! empty( $args['search'] ) ) {

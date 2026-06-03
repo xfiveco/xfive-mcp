@@ -64,4 +64,22 @@ abstract class AbilitiesBase {
 	public function permission_callback(): bool {
 		return is_user_logged_in();
 	}
+
+	/**
+	 * Validate that a taxonomy slug is present and registered.
+	 *
+	 * @param string $taxonomy Taxonomy slug.
+	 * @return \WP_Error|null WP_Error when invalid, null when valid.
+	 */
+	protected function validate_taxonomy( string $taxonomy ): ?\WP_Error {
+		if ( '' === $taxonomy ) {
+			return new \WP_Error( 'missing_param', 'taxonomy is required.' );
+		}
+
+		if ( ! taxonomy_exists( $taxonomy ) ) {
+			return new \WP_Error( 'invalid_taxonomy', sprintf( 'Taxonomy "%s" is not registered.', $taxonomy ) );
+		}
+
+		return null;
+	}
 }

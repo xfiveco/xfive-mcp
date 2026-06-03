@@ -90,14 +90,13 @@ class TermDelete extends AbilitiesBase {
 			return new \WP_Error( 'missing_param', 'term_id and taxonomy are required.' );
 		}
 
-		if ( ! taxonomy_exists( $taxonomy ) ) {
-			return new \WP_Error( 'invalid_taxonomy', sprintf( 'Taxonomy "%s" is not registered.', $taxonomy ) );
+		$invalid = $this->validate_taxonomy( $taxonomy );
+		if ( $invalid instanceof \WP_Error ) {
+			return $invalid;
 		}
 
-		if ( ! term_exists( $term_id, $taxonomy ) ) {
-			return new \WP_Error( 'invalid_term', sprintf( 'Term %1$d not found in "%2$s".', $term_id, $taxonomy ) );
-		}
-
+		// wp_delete_term validates the term itself: WP_Error on failure,
+		// false/0 when the term does not exist in the taxonomy.
 		$result = wp_delete_term( $term_id, $taxonomy );
 
 		if ( is_wp_error( $result ) ) {
@@ -105,7 +104,7 @@ class TermDelete extends AbilitiesBase {
 		}
 
 		if ( false === $result || 0 === $result ) {
-			return new \WP_Error( 'delete_failed', sprintf( 'Could not delete term %1$d from "%2$s".', $term_id, $taxonomy ) );
+			return new \WP_Error( 'invalid_term', sprintf( 'Term %1$d not found in "%2$s".', $term_id, $taxonomy ) );
 		}
 
 		return array(

@@ -102,22 +102,13 @@ class TermCreate extends AbilitiesBase {
 		$name     = $args['name'] ?? '';
 		$taxonomy = $args['taxonomy'] ?? '';
 
-		if ( '' === $name || '' === $taxonomy ) {
+		if ( '' === $name ) {
 			return new \WP_Error( 'missing_param', 'name and taxonomy are required.' );
 		}
 
-		if ( ! taxonomy_exists( $taxonomy ) ) {
-			return new \WP_Error( 'invalid_taxonomy', sprintf( 'Taxonomy "%s" is not registered.', $taxonomy ) );
-		}
-
-		// Return the existing term if one with this name already exists.
-		$existing = get_term_by( 'name', $name, $taxonomy );
-		if ( $existing instanceof \WP_Term ) {
-			return array(
-				'term_id'  => (int) $existing->term_id,
-				'existing' => true,
-				'hint'     => sprintf( 'Term "%1$s" already existed in "%2$s".', $name, $taxonomy ),
-			);
+		$invalid = $this->validate_taxonomy( $taxonomy );
+		if ( $invalid instanceof \WP_Error ) {
+			return $invalid;
 		}
 
 		$insert_args = array();
@@ -134,6 +125,17 @@ class TermCreate extends AbilitiesBase {
 		$result = wp_insert_term( $name, $taxonomy, $insert_args );
 
 		if ( is_wp_error( $result ) ) {
+			// wp_insert_term dedupes by slug/name and reports the existing term ID
+			// in the error data; surface that as the idempotent "existing" path.
+			$existing_id = (int) ( $result->get_error_data() ?: 0 );
+			if ( 'term_exists' === $result->get_error_code() && $existing_id > 0 ) {
+				return array(
+					'term_id'  => $existing_id,
+					'existing' => true,
+					'hint'     => sprintf( 'Term "%1$s" already existed in "%2$s".', $name, $taxonomy ),
+				);
+			}
+
 			return $result;
 		}
 

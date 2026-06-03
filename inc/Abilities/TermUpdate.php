@@ -106,12 +106,9 @@ class TermUpdate extends AbilitiesBase {
 			return new \WP_Error( 'missing_param', 'term_id and taxonomy are required.' );
 		}
 
-		if ( ! taxonomy_exists( $taxonomy ) ) {
-			return new \WP_Error( 'invalid_taxonomy', sprintf( 'Taxonomy "%s" is not registered.', $taxonomy ) );
-		}
-
-		if ( ! term_exists( $term_id, $taxonomy ) ) {
-			return new \WP_Error( 'invalid_term', sprintf( 'Term %1$d not found in "%2$s".', $term_id, $taxonomy ) );
+		$invalid = $this->validate_taxonomy( $taxonomy );
+		if ( $invalid instanceof \WP_Error ) {
+			return $invalid;
 		}
 
 		$update_args = array();
