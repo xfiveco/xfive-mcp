@@ -26,8 +26,8 @@ trait Config {
 			'post-update',
 			'post-trash',
 		),
-		'xfive-images' => array(
-			'image-upload',
+		'xfive-media'  => array(
+			'media-upload',
 			'media-migrate',
 		),
 		'xfive-menus'  => array(

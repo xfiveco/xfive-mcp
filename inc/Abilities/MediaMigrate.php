@@ -31,7 +31,7 @@ class MediaMigrate extends AbilitiesBase {
 	 * @return string The ability description.
 	 */
 	public function get_description(): string {
-		return 'Push an existing media-library file (image or video) from THIS site to a remote WordPress site (e.g. local -> staging), server-to-server, without sending file bytes through the agent. Runs on the source site: reads the attachment from disk and POSTs the file to the remote site\'s built-in REST media endpoint (wp/v2/media) authenticated with an Application Password. Returns the REMOTE attachment id + url. Configure the remote target ONCE in wp-config.php on this (source) site via the constants XFIVE_MCP_REMOTE_URL (e.g. https://staging.example.com), XFIVE_MCP_REMOTE_USER and XFIVE_MCP_REMOTE_APP_PASSWORD, then call this tool with just attachment_id. The remote site must be reachable over HTTP from this server. Large files (e.g. video) are sent in a single request and are subject to the remote server\'s upload_max_filesize / post_max_size / memory_limit. Allowed types: jpeg, png, gif, webp, svg, mp4, webm, ogg, mov. Pass attachment_id (preferred) or source_path (absolute path on this server).';
+		return 'Push an existing media-library file (image or video) from THIS site to a remote WordPress site (e.g. local -> staging), server-to-server, without sending file bytes through the agent. Runs on the source site: reads the attachment from disk and POSTs the file to the remote site\'s built-in REST media endpoint (wp/v2/media) authenticated with an Application Password. Returns the REMOTE attachment id + url. Configure the remote target ONCE in wp-config.php on this (source) site via the constants XFIVE_MCP_REMOTE_URL (e.g. https://staging.example.com), XFIVE_MCP_REMOTE_USER and XFIVE_MCP_REMOTE_APP_PASSWORD, then call this tool with just attachment_id. The remote site must be reachable over HTTP from this server. Large files (e.g. video) are sent in a single request and are subject to the remote server\'s upload_max_filesize / post_max_size / memory_limit. Any file type this site permits is accepted (see get_allowed_mime_types). Pass attachment_id (preferred) or source_path (absolute path on this server). NOTE: to bring an EXTERNAL file (remote URL or local path) INTO this site\'s library, use Media - Upload instead.';
 	}
 
 	/**
@@ -147,20 +147,9 @@ class MediaMigrate extends AbilitiesBase {
 			);
 		}
 
-		$mime_type          = mime_content_type( $source_path );
-		$allowed_mime_types = array(
-			'image/jpeg',
-			'image/png',
-			'image/gif',
-			'image/webp',
-			'image/svg+xml',
-			'video/mp4',
-			'video/webm',
-			'video/ogg',
-			'video/quicktime',
-		);
+		$mime_type = mime_content_type( $source_path );
 
-		if ( ! in_array( $mime_type, $allowed_mime_types, true ) ) {
+		if ( ! $this->is_allowed_mime( (string) $mime_type ) ) {
 			return array(
 				'error' => 'Unsupported file type: ' . sanitize_text_field( (string) $mime_type ),
 			);

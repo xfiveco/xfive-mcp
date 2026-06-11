@@ -66,6 +66,37 @@ abstract class AbilitiesBase {
 	}
 
 	/**
+	 * Check whether a mime type is permitted for upload on this site.
+	 *
+	 * Uses WordPress's own allowlist (get_allowed_mime_types), so it inherits
+	 * site settings, multisite restrictions and plugins that enable extra types
+	 * such as SVG.
+	 *
+	 * @param string $mime_type Mime type to check.
+	 * @return bool Whether the mime type is allowed.
+	 */
+	protected function is_allowed_mime( string $mime_type ): bool {
+		return in_array( $mime_type, array_values( get_allowed_mime_types() ), true );
+	}
+
+	/**
+	 * Resolve a file extension for a mime type from WordPress's allowlist.
+	 *
+	 * @param string $mime_type Mime type to look up.
+	 * @return string Extension without leading dot, or empty string if unknown.
+	 */
+	protected function extension_for_mime( string $mime_type ): string {
+		foreach ( get_allowed_mime_types() as $extensions => $mime ) {
+			if ( $mime === $mime_type ) {
+				// $extensions may be a pipe-delimited list like "jpg|jpeg|jpe".
+				return explode( '|', $extensions )[0];
+			}
+		}
+
+		return '';
+	}
+
+	/**
 	 * Validate that a taxonomy slug is present and registered.
 	 *
 	 * @param string $taxonomy Taxonomy slug.
