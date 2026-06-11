@@ -31,7 +31,7 @@ class AcfFieldUpdate extends AbilitiesBase {
 	 * @return string The ability description.
 	 */
 	public function get_description(): string {
-		return 'Update one or more ACF fields. For options pages use post_id "option". For post/page fields use the numeric post ID. Supports all ACF field types — pass the value in the format ACF expects (string for text/URL, integer for image/file attachment IDs, array for repeaters/galleries, object for groups/links).';
+		return 'Update one or more ACF fields. Set object_id to "option" for ACF Options pages, a numeric post ID for post/page fields, "term_{id}" (e.g. "term_47") for taxonomy-term fields, or "user_{id}" (e.g. "user_5") for user fields. Supports all ACF field types — pass the value in the format ACF expects (string for text/URL, integer for image/file attachment IDs, array for repeaters/galleries, object for groups/links).';
 	}
 
 	/**
@@ -43,9 +43,9 @@ class AcfFieldUpdate extends AbilitiesBase {
 		return array(
 			'type'       => 'object',
 			'properties' => array(
-				'post_id' => array(
+				'object_id' => array(
 					'type'        => array( 'string', 'integer' ),
-					'description' => 'The post ID to update fields on. Use "option" for ACF Options pages, or a numeric post ID for post/page fields.',
+					'description' => 'The target to update fields on. Use "option" for ACF Options pages, a numeric post ID for post/page fields, "term_{id}" for taxonomy-term fields, or "user_{id}" for user fields.',
 					'default'     => 'option',
 				),
 				'fields'  => array(
@@ -98,18 +98,32 @@ class AcfFieldUpdate extends AbilitiesBase {
 			return new \WP_Error( 'acf_missing', 'Advanced Custom Fields plugin is not active.' );
 		}
 
-		$post_id = $args['post_id'] ?? 'option';
+		$post_id = $args['object_id'] ?? 'option';
 		$fields  = $args['fields'] ?? array();
 
 		if ( empty( $fields ) || ! is_array( $fields ) ) {
 			return new \WP_Error( 'missing_param', 'fields must be a non-empty object of field_name => value pairs.' );
 		}
 
-		// Validate post_id for non-option targets.
+		// Validate post_id for non-option targets. ACF accepts string selectors
+		// "term_{id}" (taxonomy-term meta) and "user_{id}" (user meta) — pass those
+		// through unchanged after confirming the underlying object exists.
 		if ( 'option' !== $post_id && 'options' !== $post_id ) {
-			$post_id = (int) $post_id;
-			if ( ! get_post( $post_id ) ) {
-				return new \WP_Error( 'not_found', sprintf( 'Post ID %d not found.', $post_id ) );
+			if ( is_string( $post_id ) && preg_match( '/^term_(\d+)$/', $post_id, $m ) ) {
+				$term_id = (int) $m[1];
+				if ( ! get_term( $term_id ) instanceof \WP_Term ) {
+					return new \WP_Error( 'not_found', sprintf( 'Term ID %d not found.', $term_id ) );
+				}
+			} elseif ( is_string( $post_id ) && preg_match( '/^user_(\d+)$/', $post_id, $m ) ) {
+				$user_id = (int) $m[1];
+				if ( ! get_userdata( $user_id ) ) {
+					return new \WP_Error( 'not_found', sprintf( 'User ID %d not found.', $user_id ) );
+				}
+			} else {
+				$post_id = (int) $post_id;
+				if ( ! get_post( $post_id ) ) {
+					return new \WP_Error( 'not_found', sprintf( 'Post ID %d not found.', $post_id ) );
+				}
 			}
 		}
 

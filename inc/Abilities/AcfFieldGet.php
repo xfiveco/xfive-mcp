@@ -31,7 +31,7 @@ class AcfFieldGet extends AbilitiesBase {
 	 * @return string The ability description.
 	 */
 	public function get_description(): string {
-		return 'Read ACF field values. For options pages use post_id "option" (the default). For post/page/CPT fields use the numeric post ID. Omit "fields" to return ALL ACF fields for that target (formatted as ACF returns them); pass an array of field names to return only those. Read counterpart to xfive-acf-acf-field-update.';
+		return 'Read ACF field values. Set object_id to "option" for ACF Options pages (the default), a numeric post ID for post/page/CPT fields, "term_{id}" for taxonomy-term fields, or "user_{id}" for user fields. Omit "fields" to return ALL ACF fields for that target (formatted as ACF returns them); pass an array of field names to return only those. Read counterpart to xfive-acf-acf-field-update.';
 	}
 
 	/**
@@ -43,9 +43,9 @@ class AcfFieldGet extends AbilitiesBase {
 		return array(
 			'type'       => 'object',
 			'properties' => array(
-				'post_id' => array(
+				'object_id' => array(
 					'type'        => array( 'string', 'integer' ),
-					'description' => 'The post ID to read fields from. Use "option" for ACF Options pages, or a numeric post ID for post/page fields.',
+					'description' => 'The target to read fields from. Use "option" for ACF Options pages, a numeric post ID for post/page fields, "term_{id}" for taxonomy-term fields, or "user_{id}" for user fields.',
 					'default'     => 'option',
 				),
 				'fields'  => array(
@@ -94,14 +94,28 @@ class AcfFieldGet extends AbilitiesBase {
 			return new \WP_Error( 'acf_missing', 'Advanced Custom Fields plugin is not active.' );
 		}
 
-		$post_id = $args['post_id'] ?? 'option';
+		$post_id = $args['object_id'] ?? 'option';
 		$names   = $args['fields'] ?? array();
 
-		// Validate post_id for non-option targets.
+		// Validate post_id for non-option targets. ACF accepts string selectors
+		// "term_{id}" (taxonomy-term meta) and "user_{id}" (user meta) — pass those
+		// through unchanged after confirming the underlying object exists.
 		if ( 'option' !== $post_id && 'options' !== $post_id ) {
-			$post_id = (int) $post_id;
-			if ( ! get_post( $post_id ) ) {
-				return new \WP_Error( 'not_found', sprintf( 'Post ID %d not found.', $post_id ) );
+			if ( is_string( $post_id ) && preg_match( '/^term_(\d+)$/', $post_id, $m ) ) {
+				$term_id = (int) $m[1];
+				if ( ! get_term( $term_id ) instanceof \WP_Term ) {
+					return new \WP_Error( 'not_found', sprintf( 'Term ID %d not found.', $term_id ) );
+				}
+			} elseif ( is_string( $post_id ) && preg_match( '/^user_(\d+)$/', $post_id, $m ) ) {
+				$user_id = (int) $m[1];
+				if ( ! get_userdata( $user_id ) ) {
+					return new \WP_Error( 'not_found', sprintf( 'User ID %d not found.', $user_id ) );
+				}
+			} else {
+				$post_id = (int) $post_id;
+				if ( ! get_post( $post_id ) ) {
+					return new \WP_Error( 'not_found', sprintf( 'Post ID %d not found.', $post_id ) );
+				}
 			}
 		}
 
@@ -161,7 +175,7 @@ class AcfFieldGet extends AbilitiesBase {
 		}
 
 		$result['hint'] = empty( $out )
-			? 'No ACF fields returned. The target may have no values set, or get_fields() found no field groups for it. For options pages confirm post_id is "option".'
+			? 'No ACF fields returned. The target may have no values set, or get_fields() found no field groups for it. For options pages confirm object_id is "option".'
 			: sprintf( '%d field(s) returned. Image/file fields return attachment IDs (local to THIS site). For textarea fields, check meta[name].raw — when present, the stored value contained new_lines render HTML (wpautop/br); copy "raw" instead of "value" to avoid persisting markup.', count( $out ) );
 
 		return $result;
