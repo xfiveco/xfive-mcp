@@ -108,19 +108,20 @@ class OptionsUpdate extends AbilitiesBase {
 		foreach ( $entries as $name => $value ) {
 			if ( 'theme_mod' === $type ) {
 				set_theme_mod( $name, $value );
-				// set_theme_mod doesn't return a success indicator, verify it was set.
-				if ( get_theme_mod( $name ) === $value ) {
-					$updated[] = $name;
-				} else {
-					$failed[] = $name;
-				}
+				$stored = get_theme_mod( $name );
 			} else {
-				$result = update_option( $name, $value );
-				if ( $result || get_option( $name ) === $value ) {
-					$updated[] = $name;
-				} else {
-					$failed[] = $name;
-				}
+				update_option( $name, $value );
+				$stored = get_option( $name );
+			}
+
+			// set_theme_mod/update_option give no reliable success flag, so verify
+			// by read-back. Compare loosely: scalars may round-trip as strings
+			// (e.g. an integer attachment ID stored as "42"), while arrays are
+			// matched via their serialized form.
+			if ( maybe_serialize( $stored ) === maybe_serialize( $value ) || (string) $stored === (string) $value ) {
+				$updated[] = $name;
+			} else {
+				$failed[] = $name;
 			}
 		}
 
