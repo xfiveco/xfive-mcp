@@ -48,6 +48,7 @@ class WidgetUpdate extends AbilitiesBase {
 			'properties' => array(
 				'widget_id' => array( 'type' => 'string' ),
 				'settings'  => array( 'type' => 'object' ),
+				'hint'      => array( 'type' => 'string' ),
 			),
 		);
 	}
@@ -83,6 +84,7 @@ class WidgetUpdate extends AbilitiesBase {
 		return array(
 			'widget_id' => $widget_id,
 			'settings'  => $new_data,
+			'hint'      => sprintf( 'Widget "%1$s" %2$s. Stored settings returned for verification.', $widget_id, $replace ? 'settings replaced' : 'settings merged' ),
 		);
 	}
 }

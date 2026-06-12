@@ -42,6 +42,7 @@ class WidgetRemove extends AbilitiesBase {
 					'description' => 'Sidebar IDs the widget was removed from.',
 					'items'       => array( 'type' => 'string' ),
 				),
+				'hint'         => array( 'type' => 'string' ),
 			),
 		);
 	}
@@ -85,6 +86,11 @@ class WidgetRemove extends AbilitiesBase {
 			update_option( $option_key, $instances );
 		}
 
-		return array( 'removed_from' => $removed_from );
+		return array(
+			'removed_from' => $removed_from,
+			'hint'         => empty( $removed_from )
+				? sprintf( 'Widget "%s" was not found in any sidebar; nothing removed.', $widget_id )
+				: sprintf( 'Widget "%1$s" removed from %2$d sidebar(s) and its settings deleted.', $widget_id, count( $removed_from ) ),
+		);
 	}
 }

@@ -54,6 +54,7 @@ class WidgetAdd extends AbilitiesBase {
 					'type'  => 'array',
 					'items' => array( 'type' => 'string' ),
 				),
+				'hint'      => array( 'type' => 'string' ),
 			),
 		);
 	}
@@ -109,6 +110,7 @@ class WidgetAdd extends AbilitiesBase {
 		return array(
 			'widget_id' => $widget_id,
 			'sidebar'   => $current,
+			'hint'      => sprintf( 'Widget "%1$s" added to "%2$s" (%3$d widget(s) now). Verify/edit with widgets-list / widget-update.', $widget_id, $sidebar_id, count( $current ) ),
 		);
 	}
 }

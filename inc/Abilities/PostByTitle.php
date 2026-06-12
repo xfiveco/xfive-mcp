@@ -31,7 +31,7 @@ class PostByTitle extends AbilitiesBase {
 	 * @return string The ability description.
 	 */
 	public function get_description(): string {
-		return 'Look up a post ID by its exact title. Pass the matching post_type — defaults to "page". Returns post_id: null when nothing matches (NOT an error) so you can chain follow-up actions like xfive-posts-post-create.';
+		return 'Look up a post by its exact title. Pass the matching post_type — defaults to "page". Optionally narrow by post_status (defaults to "any"). Returns post_id plus the matched post\'s title, slug, status and type so a single lookup confirms the match; post_id is null when nothing matches (NOT an error) so you can chain follow-up actions like xfive-posts-post-create.';
 	}
 
 	/**
@@ -52,6 +52,11 @@ class PostByTitle extends AbilitiesBase {
 					'description' => 'Post type to search within (e.g. "page", "post", "case-study", "team-member"). Defaults to "page".',
 					'default'     => 'page',
 				),
+				'post_status' => array(
+					'type'        => 'string',
+					'description' => 'Status filter: a single status, "any", or comma-separated list. Defaults to "any".',
+					'default'     => 'any',
+				),
 			),
 			'required'   => array( 'post_title' ),
 		);
@@ -69,6 +74,22 @@ class PostByTitle extends AbilitiesBase {
 				'post_id' => array(
 					'type'        => array( 'integer', 'null' ),
 					'description' => 'The ID of the matched post, or null when no match was found.',
+				),
+				'title'   => array(
+					'type'        => 'string',
+					'description' => 'Matched post title (present only on a match).',
+				),
+				'slug'    => array(
+					'type'        => 'string',
+					'description' => 'Matched post slug (present only on a match).',
+				),
+				'status'  => array(
+					'type'        => 'string',
+					'description' => 'Matched post status (present only on a match).',
+				),
+				'type'    => array(
+					'type'        => 'string',
+					'description' => 'Matched post type (present only on a match).',
 				),
 				'hint'    => array(
 					'type' => 'string',
@@ -93,12 +114,13 @@ class PostByTitle extends AbilitiesBase {
 		$post_type = sanitize_text_field( $args['post_type'] ?? 'page' );
 		$title     = sanitize_text_field( $args['post_title'] );
 
+		$status = $this->parse_status_arg( $args['post_status'] ?? 'any' );
+
 		$query = new \WP_Query(
 			array(
-				'fields'         => 'ids',
 				'post_type'      => $post_type,
 				'posts_per_page' => 1,
-				'post_status'    => 'any',
+				'post_status'    => $status,
 				'no_found_rows'  => true,
 				'title'          => $title,
 			)
@@ -115,6 +137,15 @@ class PostByTitle extends AbilitiesBase {
 			);
 		}
 
-		return array( 'post_id' => (int) $query->posts[0] );
+		$post = $query->posts[0];
+
+		return array(
+			'post_id' => (int) $post->ID,
+			'title'   => $post->post_title,
+			'slug'    => $post->post_name,
+			'status'  => $post->post_status,
+			'type'    => $post->post_type,
+			'hint'    => sprintf( 'Matched %1$s %2$d ("%3$s", %4$s).', $post->post_type, (int) $post->ID, $post->post_name, $post->post_status ),
+		);
 	}
 }

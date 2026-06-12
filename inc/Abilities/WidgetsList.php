@@ -88,7 +88,10 @@ class WidgetsList extends AbilitiesBase {
 			);
 		}
 
-		return array( 'sidebars' => $results );
+		return array(
+			'sidebars' => $results,
+			'hint'     => sprintf( '%d sidebar(s). Each widget has type + settings; use those with widget-add/widget-update. Block widgets keep their markup under settings.content.', count( $results ) ),
+		);
 	}
 
 	/**

@@ -31,7 +31,7 @@ class PostTrash extends AbilitiesBase {
 	 * @return string The ability description.
 	 */
 	public function get_description(): string {
-		return 'Move a post to the trash.';
+		return 'Move a post to the trash, or restore (untrash) a trashed post. Pass action "trash" (default) or "untrash". This never deletes permanently — trashed posts can be restored. Returns the resulting post status.';
 	}
 
 	/**
@@ -45,7 +45,13 @@ class PostTrash extends AbilitiesBase {
 			'properties' => array(
 				'post_id' => array(
 					'type'        => 'integer',
-					'description' => 'The ID of the post to trash',
+					'description' => 'The ID of the post to trash or restore.',
+				),
+				'action'  => array(
+					'type'        => 'string',
+					'description' => 'What to do: "trash" (default) moves the post to the trash, "untrash" restores a trashed post to its previous status. Permanent deletion is intentionally NOT supported.',
+					'enum'        => array( 'trash', 'untrash' ),
+					'default'     => 'trash',
 				),
 			),
 			'required'   => array( 'post_id' ),
@@ -63,7 +69,18 @@ class PostTrash extends AbilitiesBase {
 			'properties' => array(
 				'trashed' => array(
 					'type'        => 'boolean',
-					'description' => 'Whether the post was trashed successfully',
+					'description' => 'True when the post was moved to the trash.',
+				),
+				'untrashed' => array(
+					'type'        => 'boolean',
+					'description' => 'True when the post was restored from the trash.',
+				),
+				'status'  => array(
+					'type'        => 'string',
+					'description' => 'The post status after the action.',
+				),
+				'hint'    => array(
+					'type' => 'string',
 				),
 			),
 		);
@@ -83,6 +100,40 @@ class PostTrash extends AbilitiesBase {
 			return new \WP_Error( 'not_found', 'Post not found' );
 		}
 
+		$action = $args['action'] ?? 'trash';
+
+		if ( 'untrash' === $action ) {
+			if ( 'trash' !== $post->post_status ) {
+				return array(
+					'untrashed' => false,
+					'status'    => $post->post_status,
+					'hint'      => sprintf( 'Post %1$d is not in the trash (status "%2$s"); nothing to restore.', $post_id, $post->post_status ),
+				);
+			}
+
+			$result = wp_untrash_post( $post_id );
+
+			if ( ! $result ) {
+				return new \WP_Error( 'untrash_failed', 'Failed to restore post from trash' );
+			}
+
+			$status = get_post_status( $post_id );
+
+			return array(
+				'untrashed' => true,
+				'status'    => $status,
+				'hint'      => sprintf( 'Post %1$d restored from trash to status "%2$s".', $post_id, $status ),
+			);
+		}
+
+		if ( 'trash' === $post->post_status ) {
+			return array(
+				'trashed' => true,
+				'status'  => 'trash',
+				'hint'    => sprintf( 'Post %d is already in the trash. Use action "untrash" to restore it.', $post_id ),
+			);
+		}
+
 		$result = wp_trash_post( $post_id );
 
 		if ( ! $result ) {
@@ -91,6 +142,8 @@ class PostTrash extends AbilitiesBase {
 
 		return array(
 			'trashed' => true,
+			'status'  => 'trash',
+			'hint'    => sprintf( 'Post %d moved to trash. Restore with action "untrash"; this tool never deletes permanently.', $post_id ),
 		);
 	}
 }

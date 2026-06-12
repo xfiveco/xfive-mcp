@@ -31,7 +31,7 @@ class AcfFieldUpdate extends AbilitiesBase {
 	 * @return string The ability description.
 	 */
 	public function get_description(): string {
-		return 'Update one or more ACF fields. Set object_id to "option" for ACF Options pages, a numeric post ID for post/page fields, "term_{id}" (e.g. "term_47") for taxonomy-term fields, or "user_{id}" (e.g. "user_5") for user fields. Supports all ACF field types — pass the value in the format ACF expects (string for text/URL, integer for image/file attachment IDs, array for repeaters/galleries, object for groups/links).';
+		return 'Update one or more ACF fields. Set object_id to "option" for ACF Options pages, a numeric post ID for post/page fields, "term_{id}" (e.g. "term_47") for taxonomy-term fields, or "user_{id}" (e.g. "user_5") for user fields. Supports all ACF field types — pass the value in the format ACF expects (string for text/URL, integer for image/file attachment IDs, array for repeaters/galleries, object for groups/links). Returns "values" (read-after-write of each field via get_field) for verification; a field whose stored value already equaled the new value counts as updated, not failed.';
 	}
 
 	/**
@@ -75,10 +75,14 @@ class AcfFieldUpdate extends AbilitiesBase {
 				),
 				'failed'  => array(
 					'type'        => 'array',
-					'description' => 'List of field names that failed to update.',
+					'description' => 'List of field names that genuinely failed to update (excludes "value unchanged" cases, which count as updated).',
 					'items'       => array(
 						'type' => 'string',
 					),
+				),
+				'values'  => array(
+					'type'        => 'object',
+					'description' => 'Read-after-write: field_name => the value ACF returns now (get_field), for verification.',
 				),
 				'hint'    => array(
 					'type' => 'string',
@@ -129,11 +133,18 @@ class AcfFieldUpdate extends AbilitiesBase {
 
 		$updated = array();
 		$failed  = array();
+		$values  = array();
 
 		foreach ( $fields as $field_name => $value ) {
 			$result = update_field( $field_name, $value, $post_id );
 
-			if ( $result ) {
+			// Read-after-write. update_field returns false both on genuine
+			// failure AND when the value was already identical — disambiguate
+			// by comparing the stored value to what we tried to set.
+			$stored                = get_field( $field_name, $post_id );
+			$values[ $field_name ] = $stored;
+
+			if ( $result || $this->values_match( $stored, $value ) ) {
 				$updated[] = $field_name;
 			} else {
 				$failed[] = $field_name;
@@ -143,12 +154,105 @@ class AcfFieldUpdate extends AbilitiesBase {
 		$result = array(
 			'updated' => $updated,
 			'failed'  => $failed,
+			'values'  => $values,
 		);
 
 		if ( ! empty( $failed ) ) {
-			$result['hint'] = 'For failed fields: confirm the field exists on this post type (check ACF field group location rules), use the field NAME (not key), and that the value matches the field type (image=int ID, repeater=array, link={url,title,target}). update_field returns false when the value is unchanged from the existing one — that also lands in "failed".';
+			$result['hint'] = 'For failed fields: confirm the field exists on this post type (check ACF field group location rules — see xfive-acf-acf-field-schema), use the field NAME (not key), and that the value matches the field type (image=int ID, repeater=array, link={url,title,target}). Check "values" for what is actually stored now.';
 		}
 
 		return $result;
+	}
+
+	/**
+	 * Whether the stored value matches the value we attempted to set.
+	 *
+	 * Tolerant by design: ACF may return a media/relationship field in a
+	 * different shape than it was written (e.g. an attachment ID written in,
+	 * an array read back). Normalize both sides to attachment/object IDs
+	 * before comparing, falling back to a loose scalar compare.
+	 *
+	 * @param mixed $stored  Value read back via get_field().
+	 * @param mixed $written Value passed to update_field().
+	 * @return bool
+	 */
+	private function values_match( $stored, $written ): bool {
+		$norm = static function ( $v ) {
+			if ( is_array( $v ) ) {
+				// Single media/object array -> its id.
+				if ( isset( $v['id'] ) || isset( $v['ID'] ) ) {
+					return (int) ( $v['id'] ?? $v['ID'] );
+				}
+				// List -> list of ids/scalars.
+				return array_map(
+					static function ( $item ) {
+						if ( is_array( $item ) && ( isset( $item['id'] ) || isset( $item['ID'] ) ) ) {
+							return (int) ( $item['id'] ?? $item['ID'] );
+						}
+						if ( is_object( $item ) && isset( $item->ID ) ) {
+							return (int) $item->ID;
+						}
+						return is_scalar( $item ) ? (string) $item : $item;
+					},
+					$v
+				);
+			}
+			if ( is_object( $v ) && isset( $v->ID ) ) {
+				return (int) $v->ID;
+			}
+			return $v;
+		};
+
+		$a = $norm( $stored );
+		$b = $norm( $written );
+
+		if ( is_array( $a ) && is_array( $b ) ) {
+			// Compare structurally. Scalars are coerced to strings ("5" === 5),
+			// but nested arrays (repeater/group rows) are compared recursively
+			// instead of being flattened to the literal "Array".
+			return $this->deep_loose_equal( $a, $b );
+		}
+
+		// Loose scalar compare ("5" == 5), but guard the null/empty-string trap.
+		if ( ( null === $a || '' === $a ) xor ( null === $b || '' === $b ) ) {
+			return false;
+		}
+
+		return $a == $b; // phpcs:ignore WordPress.PHP.StrictComparisons.LooseComparison -- intentional cross-type compare for ACF round-trip.
+	}
+
+	/**
+	 * Recursively compare two normalized values for ACF round-trip equality.
+	 *
+	 * Scalars compare cross-type via string coercion ("5" matches 5); arrays
+	 * compare key-by-key and recurse, so repeater/group rows (arrays of arrays)
+	 * are compared by content rather than collapsed to the string "Array".
+	 *
+	 * @param mixed $a First value.
+	 * @param mixed $b Second value.
+	 * @return bool
+	 */
+	private function deep_loose_equal( $a, $b ): bool {
+		if ( is_array( $a ) || is_array( $b ) ) {
+			if ( ! is_array( $a ) || ! is_array( $b ) ) {
+				return false;
+			}
+			if ( array_keys( $a ) !== array_keys( $b ) ) {
+				return false;
+			}
+			foreach ( $a as $key => $value ) {
+				if ( ! $this->deep_loose_equal( $value, $b[ $key ] ) ) {
+					return false;
+				}
+			}
+			return true;
+		}
+
+		// Scalars/null: guard the null/empty-string trap, then loose-compare.
+		if ( ( null === $a || '' === $a ) xor ( null === $b || '' === $b ) ) {
+			return false;
+		}
+
+		return (string) $a === (string) $b;
 	}
 }

@@ -14,57 +14,66 @@ The canonical reference for each tool is its PHP class in `inc/Abilities/` — r
 
 All tools register under the `xfive-mcp` server with REST namespace `xfive-mcp/v1` and route `mcp`. Each is grouped by category.
 
+Tools follow a read/write-symmetry rule: anything a write tool can set, a read tool can return — so content can be migrated between sites without silently dropping fields. IDs of attachments and terms are **site-local**; tool hints flag them so the agent remaps when migrating.
+
 ### Blocks (read-only)
 
 | Tool | Purpose |
 |---|---|
-| `block-schema` | Get the registration schema (attributes + supports) for a block. Call BEFORE writing block markup. |
-| `block-tree` | Parse a post's `post_content` into a Gutenberg block tree (top-level blocks + their attrs/innerBlocks). |
+| `block-schema` | Get the registration schema for a block: attributes, supports, `renderMode`/`seedAs` (how to seed the comment), and nesting info (`usesInnerBlocks`, `allowedBlocks`, `parent`). Call BEFORE writing block markup. |
+| `block-tree` | Parse a post's `post_content` into a Gutenberg block tree. `attrs_only` drops innerHTML/innerContent; `depth` summarizes blocks past the limit as `{blockName, childCount, truncated}`. |
 
 ### Posts
 
 | Tool | Purpose |
 |---|---|
-| `post-by-title` | Look up a post ID by exact title + post_type. Returns `post_id: null` (not an error) when nothing matches. |
-| `post-create` | Create a new post / page / CPT entry. Returns the new `post_id`. |
-| `post-update` | Update post-level fields (title, status, optionally content). |
+| `post-list` | Enumerate posts of one or more post types, with status, search, taxonomy + `meta_query` filters, pagination, ordering, and a `fields` mode (`ids` / `summary` / `full`). |
+| `post-by-title` | Look up a post by exact title + post_type (optional `post_status`). Returns `post_id: null` (not an error) when nothing matches, plus the matched title/slug/status/type. |
+| `post-get-content` | Read the raw `post_content` markup string (+ `post_id`, `length`). |
+| `post-get-meta` | Read post meta plus the full post object for migration (title, slug, status, type, excerpt, parent, menu_order, author, date, modified, comment/ping status, password, `featured_image_id`). |
+| `post-create` | Create a post / page / CPT in one call: every `wp_insert_post` field plus `_thumbnail_id` (featured image), `meta_input`, and `tax_input` (assign terms). Returns the new `post_id`. |
+| `post-update` | Update post-level fields (pass-through to `wp_update_post`) plus `_thumbnail_id`, `meta_input`, `tax_input`. |
 | `post-update-content` | Replace `post_content` with new Gutenberg markup. The primary tool for ALL block edits. |
-| `post-get-content` | Read the raw `post_content` markup string. |
-| `post-trash` | Move a post to the trash (denied by default in `.claude/settings.json`). |
+| `post-meta-update` | Set/delete arbitrary core post meta (`update_post_meta`; pass `null` to delete). For ACF use `acf-field-update`. |
+| `post-trash` | Move a post to the trash, or restore it (`action: "trash" \| "untrash"`). Permanent deletion is intentionally not supported. |
 
 ### Media
 
 | Tool | Purpose |
 |---|---|
-| `image-upload` | Upload an image to the media library from a remote URL or a local filesystem path. Returns attachment `id` + `url`. |
-| `media-migrate` | Push an existing media file (image or video) from THIS site to a remote WordPress site (e.g. local → staging), server-to-server. Reads the attachment from disk and POSTs it to the remote's built-in `wp/v2/media` endpoint with an application password. The agent passes only `attachment_id` — file bytes never travel through the agent. Returns the **remote** attachment `id` + `url`. See [Media migration](#media-migration-media-migrate) below for required config. |
+| `media-upload` | Bring an EXTERNAL file into the library from a remote URL or local filesystem path. Optionally set `alt`, `title`, `caption`, `description`, `post_parent`. Returns attachment `id` + `url`. |
+| `media-migrate` | Push an existing library file from THIS site to a remote WordPress site (e.g. local → staging), server-to-server. The source attachment's alt/title/caption/description are carried over (override-able). The agent passes only `attachment_id` — file bytes never travel through the agent. Returns the **remote** attachment `id` + `url`. See [Media migration](#media-migration-media-migrate) below for required config. |
 
 ### Menus
 
 | Tool | Purpose |
 |---|---|
-| `nav-menu-create` | Create a nav menu, optionally assign to a theme location, optionally seed items (custom links, posts, taxonomies, nested). |
+| `nav-menu-list` | List all menus (or one) with their items, theme locations, and per-item object_id/type/parent/classes/target. Round-trips with `nav-menu-create`. |
+| `nav-menu-create` | Create a nav menu, optionally assign to a theme location, optionally seed items (custom links, posts, taxonomies, nested via `parent_index`). |
 
 ### ACF
 
 | Tool | Purpose |
 |---|---|
-| `acf-field-update` | Update one or more ACF fields on a post or the ACF Options page (`post_id: "option"`). |
+| `acf-field-get` | Read ACF field values for a post / term / user / options page. Reverses textarea render markup (`raw`); expands image/file/gallery fields to `{id,url,filename}` in a `media` map (`expand_media`, default on). |
+| `acf-field-update` | Update one or more ACF fields (`object_id`: numeric post ID, `"term_{id}"`, `"user_{id}"`, or `"option"`). Returns read-after-write `values`; an already-equal value counts as updated, not failed. |
+| `acf-field-schema` | Read the STRUCTURE (not values) of ACF field groups for a target: field names/keys/types, nested `sub_fields`/`layouts` (repeater/group/flexible), and `choices`. Use before writing complex fields. |
 
 ### Options & theme mods
 
 | Tool | Purpose |
 |---|---|
+| `options-get` | Read `wp_options` rows (`type: "option"`) or theme mods (`type: "theme_mod"`); for theme mods, omit `names` to return all. Read counterpart to `options-update`. |
 | `options-update` | Bulk-update `wp_options` rows (`type: "option"`) or theme mods (`type: "theme_mod"`). |
 
 ### Widgets
 
 | Tool | Purpose |
 |---|---|
-| `widgets-list` | List all sidebars and the widgets assigned to each. |
-| `widget-add` | Add a widget to a sidebar. |
-| `widget-update` | Update a widget's settings. |
-| `widget-remove` | Remove a widget from a sidebar. |
+| `widgets-list` | List all sidebars and the widgets assigned to each (`widget_id`, `type`, `settings`). |
+| `widget-add` | Add a widget to a sidebar (`type` + `settings`, optional `position`). |
+| `widget-update` | Update a widget's settings (merge, or `replace`). |
+| `widget-remove` | Remove a widget from a sidebar (and delete its stored settings). |
 
 ## Editing block content — the only flow
 
@@ -150,16 +159,23 @@ inc/
 │   ├── AbilitiesBase.php
 │   ├── BlockSchema.php
 │   ├── BlockTree.php
+│   ├── PostList.php
 │   ├── PostByTitle.php
 │   ├── PostCreate.php
 │   ├── PostUpdate.php
 │   ├── PostUpdateContent.php
 │   ├── PostGetContent.php
+│   ├── PostGetMeta.php
+│   ├── PostMetaUpdate.php
 │   ├── PostTrash.php
-│   ├── ImageUpload.php
+│   ├── MediaUpload.php
 │   ├── MediaMigrate.php
+│   ├── NavMenuList.php
 │   ├── NavMenuCreate.php
+│   ├── AcfFieldGet.php
 │   ├── AcfFieldUpdate.php
+│   ├── AcfFieldSchema.php
+│   ├── OptionsGet.php
 │   ├── OptionsUpdate.php
 │   └── Widget{sList,Add,Update,Remove}.php
 ├── WP/

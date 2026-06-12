@@ -31,7 +31,7 @@ class TermUpdate extends AbilitiesBase {
 	 * @return string The ability description.
 	 */
 	public function get_description(): string {
-		return 'Update an existing taxonomy term. Provide term_id + taxonomy (required); any of name, slug, description, parent to change. Only the provided fields are updated.';
+		return 'Update an existing taxonomy term. Provide term_id + taxonomy (required); any of name, slug, description, parent, and meta (object of non-ACF term meta_key => value; pass null as a value to delete that meta key) to change. Only the provided fields are updated. For ACF term fields use xfive-acf-acf-field-update with object_id "term_{id}".';
 	}
 
 	/**
@@ -66,6 +66,10 @@ class TermUpdate extends AbilitiesBase {
 				'parent'      => array(
 					'type'        => 'integer',
 					'description' => 'Optional new parent term ID (for hierarchical taxonomies).',
+				),
+				'meta'        => array(
+					'type'        => 'object',
+					'description' => 'Optional non-ACF term meta to set: meta_key => value. Pass null as a value to delete that key.',
 				),
 			),
 			'required'   => array( 'term_id', 'taxonomy' ),
@@ -121,19 +125,43 @@ class TermUpdate extends AbilitiesBase {
 			$update_args['parent'] = (int) $args['parent'];
 		}
 
-		if ( empty( $update_args ) ) {
-			return new \WP_Error( 'no_changes', 'Provide at least one of name, slug, description, parent to update.' );
+		$has_meta = ! empty( $args['meta'] ) && is_array( $args['meta'] );
+
+		if ( empty( $update_args ) && ! $has_meta ) {
+			return new \WP_Error( 'no_changes', 'Provide at least one of name, slug, description, parent, meta to update.' );
 		}
 
-		$result = wp_update_term( $term_id, $taxonomy, $update_args );
+		if ( ! empty( $update_args ) ) {
+			$result = wp_update_term( $term_id, $taxonomy, $update_args );
 
-		if ( is_wp_error( $result ) ) {
-			return $result;
+			if ( is_wp_error( $result ) ) {
+				return $result;
+			}
+		} elseif ( ! get_term( $term_id, $taxonomy ) instanceof \WP_Term ) {
+			return new \WP_Error( 'invalid_term', sprintf( 'Term %1$d not found in "%2$s".', $term_id, $taxonomy ) );
+		}
+
+		$meta_keys = array();
+		if ( $has_meta ) {
+			foreach ( $args['meta'] as $key => $value ) {
+				$key = (string) $key;
+				if ( null === $value ) {
+					delete_term_meta( $term_id, $key );
+				} else {
+					update_term_meta( $term_id, $key, $value );
+				}
+				$meta_keys[] = $key;
+			}
+		}
+
+		$hint = sprintf( 'Updated term %1$d in "%2$s".', $term_id, $taxonomy );
+		if ( $meta_keys ) {
+			$hint .= sprintf( ' Meta set: %s.', implode( ', ', $meta_keys ) );
 		}
 
 		return array(
-			'term_id' => (int) $result['term_id'],
-			'hint'    => sprintf( 'Updated term %1$d in "%2$s".', $term_id, $taxonomy ),
+			'term_id' => $term_id,
+			'hint'    => $hint,
 		);
 	}
 }

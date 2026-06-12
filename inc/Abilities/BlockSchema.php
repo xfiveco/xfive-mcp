@@ -32,7 +32,7 @@ class BlockSchema extends AbilitiesBase {
 	 * @return string The ability description.
 	 */
 	public function get_description(): string {
-		return 'Retrieve the registration schema (attributes + supports) for a single block by its full name. ALWAYS call this before inserting block markup so attribute keys match exactly. Chisel ACF blocks use prefix "chisel/" not "acf/" (e.g. chisel/team-members, NOT acf/team-members).';
+		return 'Retrieve the registration schema (attributes, supports, renderMode/seedAs, nesting) for a single block by its full name. ALWAYS call this before inserting block markup so attribute keys match exactly and you seed the correct comment shape (renderMode/seedAs). usesInnerBlocks/allowedBlocks/parent describe nesting (best-effort: WP does not always expose an innerBlocks flag, so a false usesInnerBlocks is not a guarantee — verify against the block\'s save.js when in doubt). Chisel ACF blocks use prefix "chisel/" not "acf/" (e.g. chisel/team-members, NOT acf/team-members).';
 	}
 
 	/**
@@ -93,6 +93,20 @@ class BlockSchema extends AbilitiesBase {
 				'seedAs'      => array(
 					'type'        => 'string',
 					'description' => 'Required block-comment shape when writing markup. Static blocks MUST be seeded as opening+closing tags with the rendered inner HTML between them. Only dynamic blocks may be self-closing.',
+				),
+				'usesInnerBlocks' => array(
+					'type'        => 'boolean',
+					'description' => 'True when the block accepts nested inner blocks (has an InnerBlocks region). When true, seed markup must wrap the inner block comments between the open/close tags.',
+				),
+				'allowedBlocks'   => array(
+					'type'        => 'array',
+					'description' => 'When set, only these block names may be nested inside (from block.json allowedBlocks). Empty/absent = no restriction.',
+					'items'       => array( 'type' => 'string' ),
+				),
+				'parent'          => array(
+					'type'        => 'array',
+					'description' => 'When set, this block may only be inserted inside these parent block(s) (from block.json parent).',
+					'items'       => array( 'type' => 'string' ),
 				),
 				'hint'        => array(
 					'type' => 'string',
@@ -171,6 +185,24 @@ class BlockSchema extends AbilitiesBase {
 		$block_data['seedAs']     = $is_dynamic
 			? 'Self-closing OK: <!-- wp:' . $block_name . ' {ATTRS} /-->'
 			: 'MUST be paired with rendered inner HTML: <!-- wp:' . $block_name . ' {ATTRS} -->INNER_HTML<!-- /wp:' . $block_name . ' -->. Self-closing form will trigger "Block validation failed" in the editor.';
+
+		// InnerBlocks / nesting constraints. supports.innerBlocks is not reliably
+		// set, so infer from the "uses_context"/block.json hints we do have:
+		// allowed_blocks (block.json "allowedBlocks") and parent.
+		$allowed_blocks = $block_type->allowed_blocks ?? null;
+		$parent         = $block_type->parent ?? null;
+
+		$has_experimental_inner = is_array( $block_type->supports ?? null ) && ! empty( $block_type->supports['__experimentalInnerBlocks'] );
+
+		// A declared allowedBlocks list (even empty) means the block has an
+		// InnerBlocks region; otherwise fall back to the experimental support.
+		$block_data['usesInnerBlocks'] = is_array( $allowed_blocks ) || $has_experimental_inner;
+		if ( is_array( $allowed_blocks ) ) {
+			$block_data['allowedBlocks'] = array_values( $allowed_blocks );
+		}
+		if ( is_array( $parent ) && ! empty( $parent ) ) {
+			$block_data['parent'] = array_values( $parent );
+		}
 
 		return $block_data;
 	}

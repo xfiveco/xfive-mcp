@@ -31,7 +31,7 @@ class MediaUpload extends AbilitiesBase {
 	 * @return string The ability description.
 	 */
 	public function get_description(): string {
-		return 'Bring an EXTERNAL file INTO this site\'s media library and return its attachment ID + URL. Source is outside the library: provide ONE of file_url (remote http/https URL, will be downloaded) OR local_path (absolute filesystem path on this server). Any file type this site permits is accepted (see get_allowed_mime_types - typically images, video, audio, pdf, etc.; SVG requires a plugin that allows it). Use the returned id as a featured image, ACF media field value, or block attribute. NOTE: to send a file that is ALREADY in this library OUT to another WordPress site (e.g. local -> staging), use Media - Migrate instead.';
+		return 'Bring an EXTERNAL file INTO this site\'s media library and return its attachment ID + URL. Source is outside the library: provide ONE of file_url (remote http/https URL, will be downloaded) OR local_path (absolute filesystem path on this server). Optionally set image metadata on the new attachment: alt, title, caption, description, and post_parent (attach to a post ID). Any file type this site permits is accepted (see get_allowed_mime_types - typically images, video, audio, pdf, etc.; SVG requires a plugin that allows it). Use the returned id as a featured image, ACF media field value, or block attribute. NOTE: to send a file that is ALREADY in this library OUT to another WordPress site (e.g. local -> staging), use Media - Migrate instead.';
 	}
 
 	/**
@@ -43,13 +43,33 @@ class MediaUpload extends AbilitiesBase {
 		return array(
 			'type'       => 'object',
 			'properties' => array(
-				'file_url'   => array(
+				'file_url'    => array(
 					'type'        => 'string',
 					'description' => 'Remote URL to download (http/https). Mutually exclusive with local_path.',
 				),
-				'local_path' => array(
+				'local_path'  => array(
 					'type'        => 'string',
 					'description' => 'Absolute filesystem path on the server. Mutually exclusive with file_url.',
+				),
+				'alt'         => array(
+					'type'        => 'string',
+					'description' => 'Optional alt text for the image (_wp_attachment_image_alt).',
+				),
+				'title'       => array(
+					'type'        => 'string',
+					'description' => 'Optional attachment title. Defaults to the filename.',
+				),
+				'caption'     => array(
+					'type'        => 'string',
+					'description' => 'Optional caption (post_excerpt).',
+				),
+				'description' => array(
+					'type'        => 'string',
+					'description' => 'Optional description (post_content).',
+				),
+				'post_parent' => array(
+					'type'        => 'integer',
+					'description' => 'Optional post ID to attach this media to.',
 				),
 			),
 		);
@@ -94,17 +114,53 @@ class MediaUpload extends AbilitiesBase {
 		$local_path = $args['local_path'] ?? '';
 
 		if ( $local_path ) {
-			return $this->annotate_result( $this->upload_from_local_path( $local_path ) );
-		}
-
-		if ( ! $file_url ) {
+			$result = $this->upload_from_local_path( $local_path );
+		} elseif ( $file_url ) {
+			$result = $this->upload_from_url( $file_url );
+		} else {
 			return array(
 				'error' => 'Provide either file_url or local_path.',
 				'hint'  => 'Pass file_url for remote downloads (http/https) or local_path for an absolute filesystem path.',
 			);
 		}
 
-		return $this->annotate_result( $this->upload_from_url( $file_url ) );
+		if ( is_array( $result ) && isset( $result['id'] ) ) {
+			$this->apply_metadata( (int) $result['id'], $args );
+		}
+
+		return $this->annotate_result( $result );
+	}
+
+	/**
+	 * Apply optional alt/title/caption/description/post_parent to an attachment.
+	 *
+	 * @param int   $attachment_id The new attachment ID.
+	 * @param array $args          Ability arguments.
+	 * @return void
+	 */
+	private function apply_metadata( int $attachment_id, array $args ): void {
+		if ( isset( $args['alt'] ) ) {
+			update_post_meta( $attachment_id, '_wp_attachment_image_alt', sanitize_text_field( (string) $args['alt'] ) );
+		}
+
+		$postarr = array();
+		if ( isset( $args['title'] ) ) {
+			$postarr['post_title'] = (string) $args['title'];
+		}
+		if ( isset( $args['caption'] ) ) {
+			$postarr['post_excerpt'] = (string) $args['caption'];
+		}
+		if ( isset( $args['description'] ) ) {
+			$postarr['post_content'] = (string) $args['description'];
+		}
+		if ( isset( $args['post_parent'] ) ) {
+			$postarr['post_parent'] = (int) $args['post_parent'];
+		}
+
+		if ( ! empty( $postarr ) ) {
+			$postarr['ID'] = $attachment_id;
+			wp_update_post( $postarr );
+		}
 	}
 
 	/**

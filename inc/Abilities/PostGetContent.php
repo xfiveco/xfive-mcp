@@ -65,6 +65,14 @@ class PostGetContent extends AbilitiesBase {
 					'type'        => 'string',
 					'description' => 'Raw post_content as Gutenberg block markup.',
 				),
+				'post_id' => array(
+					'type'        => 'integer',
+					'description' => 'The post ID the content belongs to (echoed back).',
+				),
+				'length'  => array(
+					'type'        => 'integer',
+					'description' => 'Character length of the raw content.',
+				),
 				'hint'    => array(
 					'type' => 'string',
 				),
@@ -94,12 +102,15 @@ class PostGetContent extends AbilitiesBase {
 		}
 
 		$content = $post->post_content;
+		$length  = mb_strlen( $content );
 
 		return array(
 			'content' => $content,
-			'hint'    => $content === ''
+			'post_id' => $post_id,
+			'length'  => $length,
+			'hint'    => '' === $content
 				? 'Post is empty. Insert blocks with xfive-posts-post-update-content (call xfive-blocks-block-schema for each block first).'
-				: 'To edit, modify the markup string and write it back via xfive-posts-post-update-content.',
+				: sprintf( 'Post %1$d, %2$d chars. To edit, modify the markup string and write it back via xfive-posts-post-update-content.', $post_id, $length ),
 		);
 	}
 }

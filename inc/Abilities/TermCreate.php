@@ -31,7 +31,7 @@ class TermCreate extends AbilitiesBase {
 	 * @return string The ability description.
 	 */
 	public function get_description(): string {
-		return 'Create a taxonomy term. Provide name + taxonomy (required); slug, description, parent (term ID) optional. If a term with the same name already exists in the taxonomy, returns its existing term_id (does not error). Returns the term_id for assigning to posts or ACF taxonomy fields.';
+		return 'Create a taxonomy term. Provide name + taxonomy (required); slug, description, parent (term ID), and meta (object of non-ACF term meta_key => value) optional. If a term with the same name already exists in the taxonomy, returns its existing term_id (does not error) WITHOUT applying meta. Returns the term_id for assigning to posts or ACF taxonomy fields. For ACF term fields use xfive-acf-acf-field-update with object_id "term_{id}" after.';
 	}
 
 	/**
@@ -62,6 +62,10 @@ class TermCreate extends AbilitiesBase {
 				'parent'      => array(
 					'type'        => 'integer',
 					'description' => 'Optional parent term ID (for hierarchical taxonomies).',
+				),
+				'meta'        => array(
+					'type'        => 'object',
+					'description' => 'Optional non-ACF term meta to set on the new term: meta_key => value. Not applied when an existing term is returned.',
 				),
 			),
 			'required'   => array( 'name', 'taxonomy' ),
@@ -139,8 +143,16 @@ class TermCreate extends AbilitiesBase {
 			return $result;
 		}
 
+		$term_id = (int) $result['term_id'];
+
+		if ( ! empty( $args['meta'] ) && is_array( $args['meta'] ) ) {
+			foreach ( $args['meta'] as $key => $value ) {
+				update_term_meta( $term_id, (string) $key, $value );
+			}
+		}
+
 		return array(
-			'term_id'  => (int) $result['term_id'],
+			'term_id'  => $term_id,
 			'existing' => false,
 			'hint'     => sprintf( 'Created term "%1$s" in "%2$s".', $name, $taxonomy ),
 		);

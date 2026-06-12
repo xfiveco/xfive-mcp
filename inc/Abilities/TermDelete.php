@@ -65,11 +65,15 @@ class TermDelete extends AbilitiesBase {
 		return array(
 			'type'       => 'object',
 			'properties' => array(
-				'deleted' => array(
+				'deleted'    => array(
 					'type'        => 'boolean',
 					'description' => 'True when the term was deleted.',
 				),
-				'hint'    => array(
+				'unassigned' => array(
+					'type'        => 'integer',
+					'description' => 'Number of objects (posts) that had this term assigned and were unassigned by the deletion.',
+				),
+				'hint'       => array(
 					'type' => 'string',
 				),
 			),
@@ -95,6 +99,11 @@ class TermDelete extends AbilitiesBase {
 			return $invalid;
 		}
 
+		// Capture how many objects are assigned before deletion so we can report
+		// how many will be unassigned (the term's count).
+		$term       = get_term( $term_id, $taxonomy );
+		$unassigned = ( $term instanceof \WP_Term ) ? (int) $term->count : 0;
+
 		// wp_delete_term validates the term itself: WP_Error on failure,
 		// false/0 when the term does not exist in the taxonomy.
 		$result = wp_delete_term( $term_id, $taxonomy );
@@ -108,8 +117,9 @@ class TermDelete extends AbilitiesBase {
 		}
 
 		return array(
-			'deleted' => true,
-			'hint'    => sprintf( 'Deleted term %1$d from "%2$s".', $term_id, $taxonomy ),
+			'deleted'    => true,
+			'unassigned' => $unassigned,
+			'hint'       => sprintf( 'Deleted term %1$d from "%2$s". Unassigned from %3$d object(s); the objects themselves were not deleted.', $term_id, $taxonomy, $unassigned ),
 		);
 	}
 }

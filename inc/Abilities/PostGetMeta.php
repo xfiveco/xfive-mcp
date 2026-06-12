@@ -31,7 +31,7 @@ class PostGetMeta extends AbilitiesBase {
 	 * @return string The ability description.
 	 */
 	public function get_description(): string {
-		return 'Read raw post meta (postmeta table) for a post. Omit "keys" to return ALL meta keys for the post; pass an array of keys to return only those. Each value is unserialized as WordPress stores it. Use this for custom meta; for ACF fields prefer xfive-acf-acf-field-get which formats values. Hidden keys (starting with "_") are included.';
+		return 'Read raw post meta (postmeta table) for a post, plus the full post object needed to migrate it: post_title, post_name (slug), post_status, post_type, post_excerpt, post_parent, menu_order, post_author, post_date, post_modified, comment_status, ping_status, post_password and featured_image_id (post thumbnail attachment ID). Omit "keys" to return ALL meta keys for the post; pass an array of keys to return only those. Each value is unserialized as WordPress stores it. Use this for custom meta; for ACF fields prefer xfive-acf-acf-field-get which formats values. Hidden keys (starting with "_") are included. featured_image_id and any attachment/term IDs in meta are site-local — remap when migrating.';
 	}
 
 	/**
@@ -73,6 +73,10 @@ class PostGetMeta extends AbilitiesBase {
 		return array(
 			'type'       => 'object',
 			'properties' => array(
+				'post' => array(
+					'type'        => 'object',
+					'description' => 'Core post fields for migration: post_title, post_name (slug), post_status, post_type, post_excerpt, post_parent, menu_order, post_author, post_date, post_modified, comment_status, ping_status, post_password, featured_image_id (post thumbnail attachment ID; site-local).',
+				),
 				'meta' => array(
 					'type'        => 'object',
 					'description' => 'Object of meta_key => value pairs.',
@@ -95,7 +99,8 @@ class PostGetMeta extends AbilitiesBase {
 		$keys    = $args['keys'] ?? array();
 		$single  = $args['single'] ?? true;
 
-		if ( ! $post_id || ! get_post( $post_id ) ) {
+		$post_obj = $post_id ? get_post( $post_id ) : null;
+		if ( ! $post_id || ! $post_obj ) {
 			return new \WP_Error( 'not_found', sprintf( 'Post ID %d not found.', $post_id ) );
 		}
 
@@ -119,8 +124,24 @@ class PostGetMeta extends AbilitiesBase {
 		}
 
 		return array(
+			'post' => array(
+				'post_title'        => $post_obj->post_title,
+				'post_name'         => $post_obj->post_name,
+				'post_status'       => $post_obj->post_status,
+				'post_type'         => $post_obj->post_type,
+				'post_excerpt'      => $post_obj->post_excerpt,
+				'post_parent'       => (int) $post_obj->post_parent,
+				'menu_order'        => (int) $post_obj->menu_order,
+				'post_author'       => (int) $post_obj->post_author,
+				'post_date'         => $post_obj->post_date,
+				'post_modified'     => $post_obj->post_modified,
+				'comment_status'    => $post_obj->comment_status,
+				'ping_status'       => $post_obj->ping_status,
+				'post_password'     => $post_obj->post_password,
+				'featured_image_id' => (int) get_post_thumbnail_id( $post_id ),
+			),
 			'meta' => $meta,
-			'hint' => sprintf( '%d meta key(s) returned for post %d. Keys starting with "_" are hidden/protected meta (ACF stores a "_field" reference key alongside each field).', count( $meta ), $post_id ),
+			'hint' => sprintf( '%d meta key(s) returned for post %d. Keys starting with "_" are hidden/protected meta (ACF stores a "_field" reference key alongside each field). The "post" object carries the core post fields for migration; featured_image_id is the attachment ID (site-local — remap on the target).', count( $meta ), $post_id ),
 		);
 	}
 }

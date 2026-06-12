@@ -18,12 +18,14 @@ trait Config {
 			'block-schema',
 		),
 		'xfive-posts'  => array(
+			'post-list',
 			'post-by-title',
 			'post-get-content',
 			'post-get-meta',
 			'post-update-content',
 			'post-create',
 			'post-update',
+			'post-meta-update',
 			'post-trash',
 		),
 		'xfive-media'  => array(
@@ -37,6 +39,7 @@ trait Config {
 		'xfive-acf'     => array(
 			'acf-field-update',
 			'acf-field-get',
+			'acf-field-schema',
 		),
 		'xfive-terms'   => array(
 			'term-list',
@@ -45,6 +48,7 @@ trait Config {
 			'term-delete',
 		),
 		'xfive-options' => array(
+			'options-get',
 			'options-update',
 		),
 		'xfive-widgets' => array(

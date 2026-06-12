@@ -31,7 +31,7 @@ class OptionsUpdate extends AbilitiesBase {
 	 * @return string The ability description.
 	 */
 	public function get_description(): string {
-		return 'Update WordPress options (update_option) or theme mods (set_theme_mod). Use type "option" for wp_options table entries, or "theme_mod" for theme modifications (e.g. custom_logo, nav_menu_locations). For theme mods, the name is the mod name and value is the mod value.';
+		return 'Update WordPress options (update_option) or theme mods (set_theme_mod). Use type "option" for wp_options table entries, or "theme_mod" for theme modifications (e.g. custom_logo, nav_menu_locations). For theme mods, the name is the mod name and value is the mod value. To read current values use xfive-options-options-get.';
 	}
 
 	/**

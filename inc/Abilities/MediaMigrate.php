@@ -31,7 +31,7 @@ class MediaMigrate extends AbilitiesBase {
 	 * @return string The ability description.
 	 */
 	public function get_description(): string {
-		return 'Push an existing media-library file (image or video) from THIS site to a remote WordPress site (e.g. local -> staging), server-to-server, without sending file bytes through the agent. Runs on the source site: reads the attachment from disk and POSTs the file to the remote site\'s built-in REST media endpoint (wp/v2/media) authenticated with an Application Password. Returns the REMOTE attachment id + url. Configure the remote target ONCE in wp-config.php on this (source) site via the constants XFIVE_MCP_REMOTE_URL (e.g. https://staging.example.com), XFIVE_MCP_REMOTE_USER and XFIVE_MCP_REMOTE_APP_PASSWORD, then call this tool with just attachment_id. The remote site must be reachable over HTTP from this server. Large files (e.g. video) are sent in a single request and are subject to the remote server\'s upload_max_filesize / post_max_size / memory_limit. Any file type this site permits is accepted (see get_allowed_mime_types). Pass attachment_id (preferred) or source_path (absolute path on this server). NOTE: to bring an EXTERNAL file (remote URL or local path) INTO this site\'s library, use Media - Upload instead.';
+		return 'Push an existing media-library file (image or video) from THIS site to a remote WordPress site (e.g. local -> staging), server-to-server, without sending file bytes through the agent. Runs on the source site: reads the attachment from disk and POSTs the file to the remote site\'s built-in REST media endpoint (wp/v2/media) authenticated with an Application Password. When migrating by attachment_id, the source attachment\'s alt text, title, caption and description are carried over to the remote automatically (override any of them with the alt/title/caption/description args). Returns the REMOTE attachment id + url. Configure the remote target ONCE in wp-config.php on this (source) site via the constants XFIVE_MCP_REMOTE_URL (e.g. https://staging.example.com), XFIVE_MCP_REMOTE_USER and XFIVE_MCP_REMOTE_APP_PASSWORD, then call this tool with just attachment_id. The remote site must be reachable over HTTP from this server. Large files (e.g. video) are sent in a single request and are subject to the remote server\'s upload_max_filesize / post_max_size / memory_limit. Any file type this site permits is accepted (see get_allowed_mime_types). Pass attachment_id (preferred) or source_path (absolute path on this server). NOTE: to bring an EXTERNAL file (remote URL or local path) INTO this site\'s library, use Media - Upload instead.';
 	}
 
 	/**
@@ -54,6 +54,22 @@ class MediaMigrate extends AbilitiesBase {
 				'filename'      => array(
 					'type'        => 'string',
 					'description' => 'Optional filename to use on the remote site. Defaults to the source file basename.',
+				),
+				'alt'           => array(
+					'type'        => 'string',
+					'description' => 'Optional alt text for the remote attachment. Overrides the source attachment\'s alt.',
+				),
+				'title'         => array(
+					'type'        => 'string',
+					'description' => 'Optional title for the remote attachment. Overrides the source title.',
+				),
+				'caption'       => array(
+					'type'        => 'string',
+					'description' => 'Optional caption for the remote attachment. Overrides the source caption.',
+				),
+				'description'   => array(
+					'type'        => 'string',
+					'description' => 'Optional description for the remote attachment. Overrides the source description.',
 				),
 			),
 		);
@@ -107,7 +123,8 @@ class MediaMigrate extends AbilitiesBase {
 		return $this->push_to_remote(
 			$source['path'],
 			$args['filename'] ?? basename( $source['path'] ),
-			$credentials
+			$credentials,
+			$this->resolve_metadata( $args )
 		);
 	}
 
@@ -156,6 +173,58 @@ class MediaMigrate extends AbilitiesBase {
 		}
 
 		return array( 'path' => $source_path );
+	}
+
+	/**
+	 * Resolve the attachment metadata to send to the remote: the source
+	 * attachment's alt/title/caption/description (when migrating by ID),
+	 * overridden by any explicit args. Returns only the keys that have a value.
+	 *
+	 * @param array $args Ability arguments.
+	 * @return array REST media fields (alt_text/title/caption/description).
+	 */
+	private function resolve_metadata( array $args ): array {
+		$meta = array(
+			'title'       => '',
+			'caption'     => '',
+			'description' => '',
+			'alt_text'    => '',
+		);
+
+		$attachment_id = isset( $args['attachment_id'] ) ? (int) $args['attachment_id'] : 0;
+		$att           = $attachment_id ? get_post( $attachment_id ) : null;
+		if ( $att ) {
+			$meta['title']       = $att->post_title;
+			$meta['caption']     = $att->post_excerpt;
+			$meta['description'] = $att->post_content;
+			$meta['alt_text']    = (string) get_post_meta( $attachment_id, '_wp_attachment_image_alt', true );
+		}
+
+		// Explicit overrides. Track which keys the caller set so an intentional
+		// "" (clear the field on the remote) is preserved past the empty-drop.
+		$explicit = array();
+		$overrides = array(
+			'title'       => 'title',
+			'caption'     => 'caption',
+			'description' => 'description',
+			'alt'         => 'alt_text',
+		);
+		foreach ( $overrides as $arg_key => $meta_key ) {
+			if ( isset( $args[ $arg_key ] ) ) {
+				$meta[ $meta_key ]   = (string) $args[ $arg_key ];
+				$explicit[ $meta_key ] = true;
+			}
+		}
+
+		// Drop empty fields we did NOT explicitly set, so we don't overwrite
+		// remote defaults with blanks — but keep an explicit "" override.
+		return array_filter(
+			$meta,
+			static function ( $v, $k ) use ( $explicit ) {
+				return '' !== $v || isset( $explicit[ $k ] );
+			},
+			ARRAY_FILTER_USE_BOTH
+		);
 	}
 
 	/**
@@ -208,9 +277,10 @@ class MediaMigrate extends AbilitiesBase {
 	 * @param string $path        Absolute local file path.
 	 * @param string $filename    Filename to use on the remote site.
 	 * @param array  $credentials Resolved remote credentials.
+	 * @param array  $meta        REST media fields to set after upload (alt_text/title/caption/description).
 	 * @return array Array with remote_id/remote_url on success or error on failure.
 	 */
-	private function push_to_remote( string $path, string $filename, array $credentials ): array {
+	private function push_to_remote( string $path, string $filename, array $credentials, array $meta = array() ): array {
 		$body = $this->read_file( $path );
 
 		if ( false === $body ) {
@@ -218,14 +288,14 @@ class MediaMigrate extends AbilitiesBase {
 		}
 
 		$endpoint = $credentials['url'] . '/wp-json/wp/v2/media';
+		$auth     = 'Basic ' . base64_encode( $credentials['user'] . ':' . $credentials['password'] ); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_encode -- HTTP Basic Auth header for Application Password.
 
 		$response = wp_remote_post(
 			$endpoint,
 			array(
 				'timeout' => 300,
 				'headers' => array(
-					// phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_encode -- HTTP Basic Auth header for Application Password.
-					'Authorization'       => 'Basic ' . base64_encode( $credentials['user'] . ':' . $credentials['password'] ),
+					'Authorization'       => $auth,
 					'Content-Type'        => mime_content_type( $path ),
 					'Content-Disposition' => 'attachment; filename="' . sanitize_file_name( $filename ) . '"',
 				),
@@ -260,10 +330,54 @@ class MediaMigrate extends AbilitiesBase {
 			return array( 'error' => 'Remote response did not include an attachment id.' );
 		}
 
+		$remote_id   = (int) $data['id'];
+		$meta_status = $this->push_metadata( $endpoint . '/' . $remote_id, $auth, $meta );
+
+		$hint = sprintf( 'Remote attachment %d created. Use this id as a featured image, ACF media field value, or block markup id ON THE REMOTE SITE.', $remote_id );
+		if ( 'skipped' !== $meta_status ) {
+			$hint .= ' ' . ( 'ok' === $meta_status
+				? 'Carried over alt/title/caption/description.'
+				: 'NOTE: file uploaded but metadata (alt/title/caption/description) could not be set on the remote — set it manually.' );
+		}
+
 		return array(
-			'remote_id'  => (int) $data['id'],
+			'remote_id'  => $remote_id,
 			'remote_url' => isset( $data['source_url'] ) ? esc_url_raw( $data['source_url'] ) : '',
-			'hint'       => sprintf( 'Remote attachment %d created. Use this id as a featured image, ACF media field value, or block markup id ON THE REMOTE SITE.', (int) $data['id'] ),
+			'hint'       => $hint,
 		);
+	}
+
+	/**
+	 * Send a follow-up request to set attachment metadata on the remote.
+	 *
+	 * @param string $endpoint Remote media item endpoint (…/wp/v2/media/{id}).
+	 * @param string $auth     Authorization header value.
+	 * @param array  $meta     REST fields to set (alt_text/title/caption/description).
+	 * @return string "ok", "failed", or "skipped" (nothing to set).
+	 */
+	private function push_metadata( string $endpoint, string $auth, array $meta ): string {
+		if ( empty( $meta ) ) {
+			return 'skipped';
+		}
+
+		$response = wp_remote_post(
+			$endpoint,
+			array(
+				'timeout' => 60,
+				'headers' => array(
+					'Authorization' => $auth,
+					'Content-Type'  => 'application/json',
+				),
+				'body'    => wp_json_encode( $meta ),
+			)
+		);
+
+		if ( is_wp_error( $response ) ) {
+			return 'failed';
+		}
+
+		$status = wp_remote_retrieve_response_code( $response );
+
+		return ( $status >= 200 && $status < 300 ) ? 'ok' : 'failed';
 	}
 }
