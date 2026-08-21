@@ -7,24 +7,32 @@ namespace Composer\Autoload;
 class ComposerStaticInit3e60079d00ca1bb521d989714a914927
 {
     public static $prefixLengthsPsr4 = array (
-        'W' => 
+        'W' =>
         array (
             'WP\\MCP\\' => 7,
         ),
-        'P' => 
+        'P' =>
         array (
             'PHPCSStandards\\Composer\\Plugin\\Installers\\PHPCodeSniffer\\' => 57,
+        ),
+        'C' =>
+        array (
+            'Composer\\Installers\\' => 20,
         ),
     );
 
     public static $prefixDirsPsr4 = array (
-        'WP\\MCP\\' => 
+        'WP\\MCP\\' =>
         array (
             0 => __DIR__ . '/..' . '/wordpress/mcp-adapter/includes',
         ),
-        'PHPCSStandards\\Composer\\Plugin\\Installers\\PHPCodeSniffer\\' => 
+        'PHPCSStandards\\Composer\\Plugin\\Installers\\PHPCodeSniffer\\' =>
         array (
             0 => __DIR__ . '/..' . '/dealerdirect/phpcodesniffer-composer-installer/src',
+        ),
+        'Composer\\Installers\\' =>
+        array (
+            0 => __DIR__ . '/..' . '/composer/installers/src/Composer/Installers',
         ),
     );
 

@@ -8,4 +8,5 @@ $baseDir = dirname($vendorDir);
 return array(
     'WP\\MCP\\' => array($vendorDir . '/wordpress/mcp-adapter/includes'),
     'PHPCSStandards\\Composer\\Plugin\\Installers\\PHPCodeSniffer\\' => array($vendorDir . '/dealerdirect/phpcodesniffer-composer-installer/src'),
+    'Composer\\Installers\\' => array($vendorDir . '/composer/installers/src/Composer/Installers'),
 );

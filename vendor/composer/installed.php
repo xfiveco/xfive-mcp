@@ -1,21 +1,21 @@
 <?php return array(
     'root' => array(
-        'name' => '__root__',
-        'pretty_version' => 'dev-master',
-        'version' => 'dev-master',
-        'reference' => 'd62ef6db4530534fc6aedaef9747a822c06c4d83',
-        'type' => 'library',
+        'name' => 'xfiveco/xfive-mcp',
+        'pretty_version' => '2.x-dev',
+        'version' => '2.9999999.9999999.9999999-dev',
+        'reference' => '0c758a18672106a9c50d5f70e2b0174260f2249d',
+        'type' => 'wordpress-plugin',
         'install_path' => __DIR__ . '/../../',
         'aliases' => array(),
         'dev' => true,
     ),
     'versions' => array(
-        '__root__' => array(
-            'pretty_version' => 'dev-master',
-            'version' => 'dev-master',
-            'reference' => 'd62ef6db4530534fc6aedaef9747a822c06c4d83',
-            'type' => 'library',
-            'install_path' => __DIR__ . '/../../',
+        'composer/installers' => array(
+            'pretty_version' => 'v2.3.0',
+            'version' => '2.3.0.0',
+            'reference' => '12fb2dfe5e16183de69e784a7b84046c43d97e8e',
+            'type' => 'composer-plugin',
+            'install_path' => __DIR__ . '/./installers',
             'aliases' => array(),
             'dev_requirement' => false,
         ),
@@ -72,6 +72,15 @@
             'install_path' => __DIR__ . '/../wp-coding-standards/wpcs',
             'aliases' => array(),
             'dev_requirement' => true,
+        ),
+        'xfiveco/xfive-mcp' => array(
+            'pretty_version' => '2.x-dev',
+            'version' => '2.9999999.9999999.9999999-dev',
+            'reference' => '0c758a18672106a9c50d5f70e2b0174260f2249d',
+            'type' => 'wordpress-plugin',
+            'install_path' => __DIR__ . '/../../',
+            'aliases' => array(),
+            'dev_requirement' => false,
         ),
     ),
 );

@@ -1,5 +1,18 @@
 {
+    "name": "xfiveco/xfive-mcp",
+    "description": "MCP server for WordPress with Abilities API",
+    "type": "wordpress-plugin",
+    "license": "GPL-2.0-or-later",
+    "homepage": "https://github.com/xfiveco/xfive-mcp",
+    "authors": [
+        {
+            "name": "Xfive",
+            "homepage": "https://xfive.co"
+        }
+    ],
     "require": {
+        "php": "^8.2",
+        "composer/installers": "^1.0 || ^2.0",
         "wordpress/mcp-adapter": "^0.4.1"
     },
     "require-dev": {
@@ -8,6 +21,7 @@
     },
     "config": {
         "allow-plugins": {
+            "composer/installers": true,
             "dealerdirect/phpcodesniffer-composer-installer": true
         }
     }
