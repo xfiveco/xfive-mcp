@@ -54,6 +54,12 @@ class OptionsGet extends AbilitiesBase {
 					'description' => 'Names to read. Required for type "option". For type "theme_mod" you may omit it to return all theme mods.',
 					'items'       => array( 'type' => 'string' ),
 				),
+				'scope' => array(
+					'type'        => 'string',
+					'description' => 'Where the setting lives: "site" (get_option, the default) or "network" (get_site_option) for settings shared by every site on a multisite network, such as upload_filetypes or fileupload_maxk. On a single site both read the same place.',
+					'enum'        => array( 'site', 'network' ),
+					'default'     => 'site',
+				),
 			),
 		);
 	}
@@ -86,7 +92,12 @@ class OptionsGet extends AbilitiesBase {
 	 */
 	public function execute_callback( array $args = array() ): array|object {
 		$type  = $args['type'] ?? 'option';
+		$scope = $args['scope'] ?? 'site';
 		$names = $args['names'] ?? array();
+
+		if ( 'network' === $scope && 'theme_mod' === $type ) {
+			return new \WP_Error( 'invalid_scope', 'Theme mods are always per site; scope "network" applies to type "option" only.' );
+		}
 
 		if ( ! is_array( $names ) ) {
 			$names = array();
@@ -120,14 +131,35 @@ class OptionsGet extends AbilitiesBase {
 			return new \WP_Error( 'missing_param', 'names is required for type "option" (an array of option_name strings).' );
 		}
 
+		$misread = array();
+
 		foreach ( $names as $name ) {
-			$name            = (string) $name;
+			$name = (string) $name;
+
+			if ( 'network' === $scope ) {
+				$values[ $name ] = get_site_option( $name, null );
+				continue;
+			}
+
 			$values[ $name ] = get_option( $name, null );
+
+			if ( $this->is_network_only_option( $name ) ) {
+				$misread[] = $name;
+			}
+		}
+
+		$hint = sprintf( '%d option(s) returned (null = not set). show_on_front is "posts" or "page"; page_on_front is a post ID.', count( $values ) );
+
+		if ( ! empty( $misread ) ) {
+			$hint = sprintf(
+				'%s is stored for the whole network, not for this site. Read it with scope "network" - the value above is whatever this site happens to hold, which is usually nothing.',
+				implode( ', ', $misread )
+			);
 		}
 
 		return array(
 			'values' => $values,
-			'hint'   => sprintf( '%d option(s) returned (null = not set). show_on_front is "posts" or "page"; page_on_front is a post ID.', count( $values ) ),
+			'hint'   => $hint,
 		);
 	}
 }

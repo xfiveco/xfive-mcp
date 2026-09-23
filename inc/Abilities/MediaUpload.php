@@ -242,6 +242,14 @@ class MediaUpload extends AbilitiesBase {
 			'size'     => filesize( $temp_file ),
 		);
 
+		$limits = $this->check_upload_limits( (string) $file['type'], (int) $file['size'] );
+
+		if ( $limits ) {
+			wp_delete_file( $temp_file );
+
+			return array( 'error' => $limits->get_error_message() );
+		}
+
 		$sideload = wp_handle_sideload(
 			$file,
 			array(
@@ -312,8 +320,10 @@ class MediaUpload extends AbilitiesBase {
 		$file_name = basename( $local_path );
 		$mime_type = mime_content_type( $local_path );
 
-		if ( ! $this->is_allowed_mime( $mime_type ) ) {
-			return array( 'error' => 'Unsupported file type: ' . sanitize_text_field( $mime_type ) );
+		$limits = $this->check_upload_limits( (string) $mime_type, (int) filesize( $local_path ) );
+
+		if ( $limits ) {
+			return array( 'error' => $limits->get_error_message() );
 		}
 
 		// Copy to a temp file so wp_handle_sideload can move it safely.

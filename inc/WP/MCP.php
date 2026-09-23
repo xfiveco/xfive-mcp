@@ -47,6 +47,58 @@ class MCP {
 	}
 
 	/**
+	 * Resolve the user open mode acts as, for the site handling this request.
+	 *
+	 * Ordered by ID so the identity is stable as users are added. On a network a
+	 * site can exist with no administrator of its own - sites created with
+	 * wp_insert_site() get no users at all, and a super admin holds no role on a
+	 * site they were not added to - so super admins are the fallback. They have
+	 * full capabilities on every site in the network, and the scope stays one
+	 * site either way because each site has its own endpoint.
+	 *
+	 * @return int User ID, or 0 when the site has nobody who could act.
+	 */
+	private function resolve_open_mode_user(): int {
+		$admins = get_users(
+			array(
+				'role'    => 'administrator',
+				'number'  => 1,
+				'orderby' => 'ID',
+				'order'   => 'ASC',
+				'fields'  => 'ID',
+			)
+		);
+
+		if ( ! empty( $admins ) ) {
+			return (int) $admins[0];
+		}
+
+		if ( ! is_multisite() ) {
+			return 0;
+		}
+
+		$fallback = 0;
+
+		foreach ( get_super_admins() as $login ) {
+			$user = get_user_by( 'login', $login );
+
+			if ( ! $user ) {
+				continue;
+			}
+
+			if ( is_user_member_of_blog( $user->ID, get_current_blog_id() ) ) {
+				return (int) $user->ID;
+			}
+
+			if ( ! $fallback ) {
+				$fallback = (int) $user->ID;
+			}
+		}
+
+		return $fallback;
+	}
+
+	/**
 	 * Permission callback.
 	 *
 	 * @param \WP_REST_Request $request Request.
@@ -55,11 +107,17 @@ class MCP {
 	 */
 	public function permission_callback( \WP_REST_Request $request ) {
 		if ( defined( 'MCP_OPEN' ) && MCP_OPEN ) {
-			$admins = get_users( array( 'role' => 'administrator', 'number' => 1 ) );
+			$user_id = $this->resolve_open_mode_user();
 
-			if ( ! empty( $admins ) ) {
-				wp_set_current_user( $admins[0]->ID );
+			if ( ! $user_id ) {
+				return new \WP_Error(
+					'mcp_no_admin',
+					sprintf( 'MCP_OPEN is enabled but no administrator was found for %s.', home_url( '/' ) ),
+					array( 'status' => 500 )
+				);
 			}
+
+			wp_set_current_user( $user_id );
 
 			return true;
 		}

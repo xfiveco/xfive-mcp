@@ -151,6 +151,58 @@ Drop a `.mcp.json` at the project root:
 
 Other MCP-capable clients (Codex, Cursor, Windsurf, Cline, Zed, etc.) use the same proxy `command` / `args` / `env` block, but each reads it from its own config file and may wrap it in a different top-level schema. Check the tool's MCP docs for the exact filename and structure — the inner server definition is portable.
 
+## Multisite
+
+The plugin works the same on a network as on a single site, with one rule: **one endpoint is one site**. The MCP route is an ordinary REST route, so WordPress resolves the site from the request path before the plugin runs — everything the abilities see (post types, taxonomies, ACF field groups, registered blocks, sidebars, the uploads directory) belongs to the site that was called. There is no cross-site parameter, and adding one would not be equivalent: `switch_to_blog()` swaps the database, not the plugins loaded for the request.
+
+Every result carries a `site` object with the ID and URL it came from, so a call to the wrong endpoint is visible immediately.
+
+### One client entry per site
+
+```json
+{
+  "mcpServers": {
+    "xfive-mcp-corporate": {
+      "type": "http",
+      "url": "http://example.test/wp-json/xfive-mcp/mcp"
+    },
+    "xfive-mcp-healthcare": {
+      "type": "http",
+      "url": "http://example.test/healthcare/wp-json/xfive-mcp/mcp"
+    }
+  }
+}
+```
+
+Network-activate the plugin once; there is nothing to install per site.
+
+### Each site needs an administrator
+
+In `MCP_OPEN` mode the endpoint acts as the first administrator of the site it was called on, ordered by user ID. Super admins are the fallback when a site has no administrator of its own — a site created with `wp_insert_site()` gets no users at all, and a super admin holds no role on a site they were not added to. If neither exists the request fails with `mcp_no_admin` naming the site, rather than running as nobody.
+
+Scope does not widen: whoever the endpoint acts as can still only reach the site that endpoint belongs to.
+
+### Network settings that affect uploads
+
+Three limits are set once for the whole network at *Network Admin → Settings → Network Settings* and override anything an individual site allows. A site-level plugin cannot widen them:
+
+| Setting | Default | Note |
+|---|---|---|
+| Upload file types | no `svg` | Add `svg` before uploading SVG logos or icons, whatever SVG plugin is active |
+| Max upload file size | 1500 KB | Low for hero images and PDFs; raise it. PHP's `upload_max_filesize` is still the ceiling |
+| Site upload space | 100 MB per site | Per-site storage quota |
+
+`media-upload` checks all three before writing and returns the limit that blocked it and the screen to change it (`upload_type_not_allowed`, `upload_too_large`, `upload_quota_exceeded`). It does not change network settings itself — widening what the whole network accepts is an administrator's decision, not an automated one.
+
+### Network settings in `options-get` / `options-update`
+
+Network settings live in the network's own table, so `update_option()` on one writes a row nothing reads. Both option abilities take a `scope`:
+
+- `site` (default) — `get_option()` / `update_option()`
+- `network` — `get_site_option()` / `update_site_option()`, requires `manage_network_options`
+
+Writing a known network setting with `scope: "site"` on a network is refused with `network_scoped_option` rather than silently stored, and reading one that way returns a hint. On a single site both scopes read and write the same place, so the argument is safe to pass anywhere.
+
 ## Architecture
 
 ```php

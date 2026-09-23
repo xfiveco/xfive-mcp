@@ -53,6 +53,12 @@ class OptionsUpdate extends AbilitiesBase {
 					'type'        => 'object',
 					'description' => 'Object of name => value pairs to update. For options: option_name => value. For theme_mods: mod_name => value (e.g. {"custom_logo": 42} to set the site logo to attachment ID 42).',
 				),
+				'scope'   => array(
+					'type'        => 'string',
+					'description' => 'Where the setting lives: "site" (update_option, the default) or "network" (update_site_option) for settings shared by every site on a multisite network, such as upload_filetypes or fileupload_maxk. Network scope needs network administrator rights. On a single site both write the same place.',
+					'enum'        => array( 'site', 'network' ),
+					'default'     => 'site',
+				),
 			),
 			'required'   => array( 'entries' ),
 		);
@@ -96,10 +102,46 @@ class OptionsUpdate extends AbilitiesBase {
 	 */
 	public function execute_callback( array $args = array() ): array|object {
 		$type    = $args['type'] ?? 'option';
+		$scope   = $args['scope'] ?? 'site';
 		$entries = $args['entries'] ?? array();
 
 		if ( empty( $entries ) || ! is_array( $entries ) ) {
 			return new \WP_Error( 'missing_param', 'entries must be a non-empty object of name => value pairs.' );
+		}
+
+		if ( 'network' === $scope ) {
+			if ( 'theme_mod' === $type ) {
+				return new \WP_Error( 'invalid_scope', 'Theme mods are always per site; scope "network" applies to type "option" only.' );
+			}
+
+			$capability = is_multisite() ? 'manage_network_options' : 'manage_options';
+
+			if ( ! current_user_can( $capability ) ) {
+				return new \WP_Error(
+					'insufficient_permissions',
+					sprintf( 'Writing a network setting needs the %s capability.', $capability ),
+					array( 'status' => 403 )
+				);
+			}
+		}
+
+		if ( 'option' === $type && 'site' === $scope ) {
+			$network_names = array_filter(
+				array_keys( $entries ),
+				function ( $name ) {
+					return $this->is_network_only_option( (string) $name );
+				}
+			);
+
+			if ( ! empty( $network_names ) ) {
+				return new \WP_Error(
+					'network_scoped_option',
+					sprintf(
+						'%s is stored for the whole network, so writing it per site would store a value nothing reads. Repeat the call with scope "network".',
+						implode( ', ', $network_names )
+					)
+				);
+			}
 		}
 
 		$updated = array();
@@ -109,6 +151,9 @@ class OptionsUpdate extends AbilitiesBase {
 			if ( 'theme_mod' === $type ) {
 				set_theme_mod( $name, $value );
 				$stored = get_theme_mod( $name );
+			} elseif ( 'network' === $scope ) {
+				update_site_option( $name, $value );
+				$stored = get_site_option( $name );
 			} else {
 				update_option( $name, $value );
 				$stored = get_option( $name );

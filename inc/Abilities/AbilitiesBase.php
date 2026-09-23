@@ -80,6 +80,111 @@ abstract class AbilitiesBase {
 	}
 
 	/**
+	 * Settings that belong to the network rather than to a site.
+	 *
+	 * On multisite these are read with get_site_option(), so writing them with
+	 * update_option() stores a row nothing reads and reports success. Names that
+	 * also exist as a genuine per-site option - admin_email, WPLANG - are
+	 * deliberately absent, because writing those per site is correct.
+	 *
+	 * @var string[]
+	 */
+	protected const NETWORK_ONLY_OPTIONS = array(
+		'active_sitewide_plugins',
+		'add_new_users',
+		'allowedthemes',
+		'banned_email_domains',
+		'blog_upload_space',
+		'fileupload_maxk',
+		'first_comment',
+		'first_comment_author',
+		'first_comment_url',
+		'first_page',
+		'first_post',
+		'global_terms_enabled',
+		'illegal_names',
+		'limited_email_domains',
+		'menu_items',
+		'ms_files_rewriting',
+		'registration',
+		'registrationnotification',
+		'site_admins',
+		'site_name',
+		'subdomain_install',
+		'upload_filetypes',
+		'upload_space_check_disabled',
+		'welcome_email',
+		'welcome_user_email',
+	);
+
+	/**
+	 * Whether a name is a network setting being addressed on a network.
+	 *
+	 * @param string $name Option name.
+	 * @return bool True when the name must be read and written with the site option functions.
+	 */
+	protected function is_network_only_option( string $name ): bool {
+		return is_multisite() && in_array( $name, self::NETWORK_ONLY_OPTIONS, true );
+	}
+
+	/**
+	 * Check a pending upload against the limits this site enforces.
+	 *
+	 * On a network the allowed types, the per-file size and the storage quota are
+	 * set once for every site (Network Admin -> Settings -> Network Settings) and
+	 * override what a single site allows - a plugin that permits SVG on this site
+	 * cannot widen the network list. That is the usual reason an upload which
+	 * works on one install fails on another, so the limit is named here rather
+	 * than left to a generic failure further down.
+	 *
+	 * @param string $mime_type Mime type of the file.
+	 * @param int    $size      File size in bytes.
+	 * @return \WP_Error|null WP_Error when the upload cannot proceed, null when it can.
+	 */
+	protected function check_upload_limits( string $mime_type, int $size ): ?\WP_Error {
+		if ( ! $this->is_allowed_mime( $mime_type ) ) {
+			return new \WP_Error(
+				'upload_type_not_allowed',
+				is_multisite()
+					? sprintf(
+						'File type %s is not in the allowed upload types for this network. Add its extension at Network Admin -> Settings -> Network Settings -> Upload file types. A site-level plugin cannot override this list.',
+						$mime_type
+					)
+					: sprintf( 'File type %s is not an allowed upload type on this site.', $mime_type )
+			);
+		}
+
+		if ( ! is_multisite() ) {
+			return null;
+		}
+
+		$max_k = (int) get_site_option( 'fileupload_maxk', 1500 );
+
+		if ( $max_k > 0 && $size > $max_k * KB_IN_BYTES ) {
+			return new \WP_Error(
+				'upload_too_large',
+				sprintf(
+					'File is %d KB and this network allows %d KB per file. Raise it at Network Admin -> Settings -> Network Settings -> Max upload file size.',
+					(int) ceil( $size / KB_IN_BYTES ),
+					$max_k
+				)
+			);
+		}
+
+		if ( ! is_upload_space_available() ) {
+			return new \WP_Error(
+				'upload_quota_exceeded',
+				sprintf(
+					'This site has used its %d MB upload quota. Raise it at Network Admin -> Settings -> Network Settings -> Site upload space, or for this site alone under Network Admin -> Sites.',
+					(int) get_site_option( 'blog_upload_space', 100 )
+				)
+			);
+		}
+
+		return null;
+	}
+
+	/**
 	 * Resolve a file extension for a mime type from WordPress's allowlist.
 	 *
 	 * @param string $mime_type Mime type to look up.
