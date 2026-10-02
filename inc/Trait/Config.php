@@ -57,6 +57,14 @@ trait Config {
 			'widget-update',
 			'widget-remove',
 		),
+		'xfive-wpml'    => array(
+			'translation-status',
+			'translation-job-get',
+			'translation-job-save',
+			'string-list',
+			'string-translate',
+			'term-translate',
+		),
 	);
 
 	/**

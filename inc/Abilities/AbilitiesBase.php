@@ -319,4 +319,48 @@ abstract class AbilitiesBase {
 
 		return null;
 	}
+
+	/**
+	 * Check that WPML and its translation management are running on this site.
+	 *
+	 * On a network WPML can be active and still unconfigured on one site, so the
+	 * setup flag is checked too - an unconfigured site has no languages to
+	 * translate into.
+	 *
+	 * @return \WP_Error|null WP_Error when WPML cannot be used, null when it can.
+	 */
+	protected function wpml_unavailable(): ?\WP_Error {
+		global $sitepress;
+
+		if ( ! defined( 'ICL_SITEPRESS_VERSION' ) || ! $sitepress instanceof \SitePress || ! function_exists( 'wpml_tm_load_job_factory' ) ) {
+			return new \WP_Error( 'wpml_inactive', sprintf( 'WPML is not active on %s.', home_url( '/' ) ) );
+		}
+
+		if ( ! $sitepress->get_setting( 'setup_complete' ) ) {
+			return new \WP_Error( 'wpml_not_set_up', sprintf( 'WPML is active on %s but its setup wizard has not been completed.', home_url( '/' ) ) );
+		}
+
+		return null;
+	}
+
+	/**
+	 * Check a language code against the languages active on this site.
+	 *
+	 * @param string $language Language code, e.g. "de" or "zh-cn".
+	 * @return \WP_Error|null WP_Error listing the active codes when it is not active, null when it is.
+	 */
+	protected function validate_wpml_language( string $language ): ?\WP_Error {
+		global $sitepress;
+
+		$active = array_keys( $sitepress->get_active_languages() );
+
+		if ( ! in_array( $language, $active, true ) ) {
+			return new \WP_Error(
+				'invalid_language',
+				sprintf( 'Language "%1$s" is not active on this site. Active: %2$s.', $language, implode( ', ', $active ) )
+			);
+		}
+
+		return null;
+	}
 }

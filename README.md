@@ -75,6 +75,19 @@ Tools follow a read/write-symmetry rule: anything a write tool can set, a read t
 | `widget-update` | Update a widget's settings (merge, or `replace`). |
 | `widget-remove` | Remove a widget from a sidebar (and delete its stored settings). |
 
+### WPML (needs WPML with its setup completed; string tools need String Translation)
+
+| Tool | Purpose |
+|---|---|
+| `translation-status` | A post's language and, per active language, its translation: post ID, status, needs-update flag, job and editor. Works for pages, posts, `wp_navigation` and `wp_template_part`. |
+| `translation-job-get` | Open (or create, `refresh: true` for a new version) WPML's translation job for an original post and a target language; returns every translatable field with its source text. |
+| `translation-job-save` | Save translated fields into a job. With `complete: true` WPML builds, links and publishes the translated post itself, the same path its own editors and XLIFF import use. |
+| `string-list` | List String Translation entries by domain and/or search, with their translations. Without a domain it also returns every domain and its string count. |
+| `string-translate` | Save string translations (marked complete), several at once. Address a string by `id`, or by `domain` + `name` + `value` to register it first. |
+| `term-translate` | Translate taxonomy terms (categories, tags, WooCommerce attribute values), several at once: each translation is created linked to its original through WPML, or renamed when it exists. `copy_meta` copies meta keys such as `order`; omit `translations` to read a term's translations. Translate terms before the posts that use them. |
+
+Jobs created while WPML's Advanced Translation Editor is the default editor are also sent to it, but that editor only shows translations typed inside it: a translation saved through `translation-job-save` is live on the site yet opens there with an empty target. Use `translation-job-get` to read source texts for a job you then fill in the Advanced editor, or switch WPML to its Classic editor if translations are imported.
+
 ## Editing block content — the only flow
 
 There are no partial-block mutation tools (block-add / update / replace / move / remove were removed; index-based mutation was fragile). To edit any block content:
